@@ -1,16 +1,34 @@
-import { Pool, type PoolClient, type QueryResultRow } from "pg";
+import { Pool, type PoolClient, type PoolConfig, type QueryResultRow } from "pg";
 import { getRuntimeEnv } from "./runtime";
 
 let pool: Pool | undefined;
-let poolUrl: string | undefined;
+let poolKey: string | undefined;
+
+function connectionConfig(databaseUrl: string, databaseCaCert?: string): PoolConfig {
+  const ca = databaseCaCert?.trim();
+  if (!ca) return { connectionString: databaseUrl };
+
+  const parsedUrl = new URL(databaseUrl);
+  for (const parameter of ["sslmode", "sslcert", "sslkey", "sslrootcert"]) {
+    parsedUrl.searchParams.delete(parameter);
+  }
+
+  return {
+    connectionString: parsedUrl.toString(),
+    ssl: { ca, rejectUnauthorized: true },
+  };
+}
 
 export function getDatabase(_locals?: App.Locals): Pool | undefined {
-  const databaseUrl = getRuntimeEnv().DATABASE_URL?.trim();
+  const runtime = getRuntimeEnv();
+  const databaseUrl = runtime.DATABASE_URL?.trim();
   if (!databaseUrl) return undefined;
-  if (!pool || poolUrl !== databaseUrl) {
-    poolUrl = databaseUrl;
+  const databaseCaCert = runtime.DATABASE_CA_CERT?.trim();
+  const currentPoolKey = `${databaseUrl}\u0000${databaseCaCert ?? ""}`;
+  if (!pool || poolKey !== currentPoolKey) {
+    poolKey = currentPoolKey;
     pool = new Pool({
-      connectionString: databaseUrl,
+      ...connectionConfig(databaseUrl, databaseCaCert),
       max: 5,
       idleTimeoutMillis: 30_000,
       connectionTimeoutMillis: 10_000,

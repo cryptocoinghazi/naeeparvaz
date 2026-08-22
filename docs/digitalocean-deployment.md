@@ -33,6 +33,8 @@ The checked-in [`.do/app.yaml`](../.do/app.yaml) attaches:
 - one 512 MiB App Platform service; and
 - one existing production PostgreSQL database named `naee-parvaz-db`.
 
+The app is connected to the default Bangalore `blr1` VPC so `${database.DATABASE_PRIVATE_URL}` stays on DigitalOcean's private network. The VPC ID in the specification is a non-secret resource identifier for this DigitalOcean account.
+
 Both are paid DigitalOcean resources. At the time of the first deployment they total approximately **$20.15/month** before taxes and overages ($5 App Platform plus $15.15 managed PostgreSQL), but always review the current [App Platform pricing](https://docs.digitalocean.com/products/app-platform/details/pricing/) and database price shown in the control panel before creating them. The specification does not deploy anything by itself.
 
 DigitalOcean's official Node guidance uses a Git repository, build command, run command and runtime environment variables. Astro's official Node adapter produces the standalone server used here. See the [App specification reference](https://docs.digitalocean.com/products/app-platform/reference/app-spec/) and [Astro Node adapter](https://docs.astro.build/en/guides/integrations-guide/node/).
@@ -42,6 +44,7 @@ DigitalOcean's official Node guidance uses a Git repository, build command, run 
 | Name | DigitalOcean storage | Secret? | Purpose |
 | --- | --- | --- | --- |
 | `DATABASE_URL` | Bindable runtime value `${database.DATABASE_PRIVATE_URL}` | Yes | Private PostgreSQL connection used by the website and migration runner. |
+| `DATABASE_CA_CERT` | Bindable runtime value `${database.CA_CERT}` | Public certificate | Verifies the managed PostgreSQL server's TLS certificate. |
 | `ADMIN_EMAIL` | Runtime variable | No | Must be exactly `editor@naeeparvaz.com`; no other address receives an editor code. |
 | `SESSION_SECRET` | Encrypted runtime variable | Yes | HMAC key for login codes and privacy-preserving request identifiers. |
 | `CONTACT_FROM_EMAIL` | Runtime variable | No | Fixed Resend sender: `website@send.naeeparvaz.com`. |
@@ -113,24 +116,25 @@ The browser's generic **Create App** wizard may infer a Node service without loa
 
 1. Sign in to [DigitalOcean](https://cloud.digitalocean.com/).
 2. Open **Apps → Create App**, choose **GitHub**, and authorize DigitalOcean to access only `cryptocoinghazi/naeeparvaz`. You may leave the wizard after the repository connection is established.
-3. Create one production PostgreSQL 18 cluster named exactly `naee-parvaz-db` in Bangalore (`blr1`) with one `db-s-1vcpu-1gb` node. Review and approve the displayed recurring database price before confirming.
-4. Install and authenticate the current [DigitalOcean CLI](https://docs.digitalocean.com/reference/doctl/how-to/install/) with a short-lived token that has only the account, app and database permissions needed for setup.
-5. Validate the app specification from the repository root:
+3. Create one production PostgreSQL 18 cluster named exactly `naee-parvaz-db` in Bangalore (`blr1`) with one `db-s-1vcpu-1gb` node. Keep it on the default `blr1` VPC and review the displayed recurring database price before confirming.
+4. In the cluster's **Users & Databases** page, add a database named exactly `naee_parvaz`. The app leaves `db_user` unset so DigitalOcean selects the managed database's default binding; its password is injected through the bindable URL and is never copied into the repository.
+5. Install and authenticate the current [DigitalOcean CLI](https://docs.digitalocean.com/reference/doctl/how-to/install/) with a short-lived token that has only the account, app and database permissions needed for setup.
+6. Validate the app specification from the repository root:
 
    ```bash
    doctl apps spec validate .do/app.yaml
    ```
 
-6. Review the validated region, service size, database binding, environment variables and total recurring price.
-7. Create the app:
+7. Review the validated region, VPC, service size, database binding, environment variables and total recurring price.
+8. Create the app:
 
    ```bash
    doctl apps create --spec .do/app.yaml
    ```
 
-8. Revoke the temporary CLI token after setup is complete. GitHub automatic deployment remains enabled for future pushes to `main`.
+9. Revoke the temporary CLI token after setup is complete. GitHub automatic deployment remains enabled for future pushes to `main`.
 
-The specification binds `DATABASE_URL` to `${database.DATABASE_PRIVATE_URL}`. DigitalOcean injects the actual private connection string at runtime; no database password is committed. DigitalOcean recommends bindable private database URLs when app and database share a VPC. See [database bindable variables](https://docs.digitalocean.com/products/app-platform/how-to/use-environment-variables/).
+The specification binds `DATABASE_URL` to `${database.DATABASE_PRIVATE_URL}` and `DATABASE_CA_CERT` to `${database.CA_CERT}`. DigitalOcean injects the actual private connection string and CA certificate at runtime; no database password is committed, and TLS verification remains enabled. The checked-in `vpc.id` must match the database cluster's `blr1` VPC. See [App Platform VPC setup](https://docs.digitalocean.com/products/app-platform/how-to/enable-vpc/) and [database bindable variables](https://docs.digitalocean.com/products/app-platform/how-to/use-environment-variables/).
 
 The production start command applies every unapplied file in `db/migrations/` under a PostgreSQL advisory lock, then starts `dist/server/entry.mjs` on the App Platform-provided port.
 
@@ -150,6 +154,7 @@ NODE_ENV=production
 ```
 
 Confirm `DATABASE_URL` displays as the bindable database value, not a copied literal password.
+Confirm `DATABASE_CA_CERT` displays as the bindable CA certificate value.
 
 Generate the authentication secret locally:
 

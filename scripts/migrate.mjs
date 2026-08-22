@@ -9,8 +9,20 @@ const migrationsDirectory = resolve(scriptDirectory, "../db/migrations");
 export async function runMigrations() {
   const databaseUrl = process.env.DATABASE_URL?.trim();
   if (!databaseUrl) throw new Error("DATABASE_URL is required before database migrations can run.");
+  const databaseCaCert = process.env.DATABASE_CA_CERT?.trim();
+  const parsedUrl = new URL(databaseUrl);
+  if (databaseCaCert) {
+    for (const parameter of ["sslmode", "sslcert", "sslkey", "sslrootcert"]) {
+      parsedUrl.searchParams.delete(parameter);
+    }
+  }
 
-  const pool = new Pool({ connectionString: databaseUrl, max: 1, connectionTimeoutMillis: 15_000 });
+  const pool = new Pool({
+    connectionString: parsedUrl.toString(),
+    ...(databaseCaCert ? { ssl: { ca: databaseCaCert, rejectUnauthorized: true } } : {}),
+    max: 1,
+    connectionTimeoutMillis: 15_000,
+  });
   const client = await pool.connect();
   try {
     await client.query("SELECT pg_advisory_lock(hashtext($1))", ["naee-parvaz-schema-migrations"]);

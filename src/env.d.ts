@@ -2,6 +2,7 @@
 interface RuntimeEnv {
   ADMIN_EMAIL?: string;
   CONTACT_FROM_EMAIL?: string;
+  DATABASE_CA_CERT?: string;
   DATABASE_URL?: string;
   LOCAL_ADMIN_CODE?: string;
   RESEND_API_KEY?: string;

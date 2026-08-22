@@ -3,6 +3,8 @@ alerts:
   - rule: DOMAIN_FAILED
 name: naee-parvaz
 region: blr
+vpc:
+  id: c7bf286a-3256-447a-887d-37ec86d74ad0
 databases:
   - name: database
     engine: PG
@@ -10,7 +12,6 @@ databases:
     production: true
     cluster_name: naee-parvaz-db
     db_name: naee_parvaz
-    db_user: naee_app
 services:
   - name: web
     github:
@@ -43,6 +44,10 @@ services:
     envs:
       - key: DATABASE_URL
         value: ${database.DATABASE_PRIVATE_URL}
+        scope: RUN_TIME
+        type: GENERAL
+      - key: DATABASE_CA_CERT
+        value: ${database.CA_CERT}
         scope: RUN_TIME
         type: GENERAL
       - key: ADMIN_EMAIL
