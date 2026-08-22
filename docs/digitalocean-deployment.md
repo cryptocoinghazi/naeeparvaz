@@ -28,12 +28,12 @@ DigitalOcean App Platform HTTPS service
                     +--> Turnstile Siteverify API
 ```
 
-The checked-in [`.do/app.yaml`](../.do/app.yaml) requests:
+The checked-in [`.do/app.yaml`](../.do/app.yaml) attaches:
 
 - one 512 MiB App Platform service; and
-- one production PostgreSQL database.
+- one existing production PostgreSQL database named `naee-parvaz-db`.
 
-Both are paid DigitalOcean resources. Review the current [App Platform pricing](https://docs.digitalocean.com/products/app-platform/details/pricing/) and database price shown in the control panel before selecting **Create Resources**. The specification does not deploy anything by itself.
+Both are paid DigitalOcean resources. At the time of the first deployment they total approximately **$20.15/month** before taxes and overages ($5 App Platform plus $15.15 managed PostgreSQL), but always review the current [App Platform pricing](https://docs.digitalocean.com/products/app-platform/details/pricing/) and database price shown in the control panel before creating them. The specification does not deploy anything by itself.
 
 DigitalOcean's official Node guidance uses a Git repository, build command, run command and runtime environment variables. Astro's official Node adapter produces the standalone server used here. See the [App specification reference](https://docs.digitalocean.com/products/app-platform/reference/app-spec/) and [Astro Node adapter](https://docs.astro.build/en/guides/integrations-guide/node/).
 
@@ -107,15 +107,28 @@ The public site key renders the widgets. The server-only secret is sent to Sitev
 
 For local development, the repository template uses Cloudflare's published dummy pair. Never use it in production. See [Turnstile test keys](https://developers.cloudflare.com/turnstile/troubleshooting/testing/).
 
-## 5. Create the DigitalOcean app
+## 5. Create the DigitalOcean database and app
+
+The browser's generic **Create App** wizard may infer a Node service without loading `.do/app.yaml`. If its review screen shows two containers, no database, no environment variables or an unexpected price, stop and do not click **Create App**. Use the checked-in specification through `doctl` as described below.
 
 1. Sign in to [DigitalOcean](https://cloud.digitalocean.com/).
-2. Open **Apps → Create App**.
-3. Choose **GitHub** and authorize DigitalOcean to access `cryptocoinghazi/naeeparvaz`.
-4. Select the `main` branch and enable automatic deployment on push.
-5. DigitalOcean should detect `.do/app.yaml`. Review every requested resource before confirming it.
-6. Confirm the region, web-service size and production PostgreSQL cost.
-7. Create the resources.
+2. Open **Apps → Create App**, choose **GitHub**, and authorize DigitalOcean to access only `cryptocoinghazi/naeeparvaz`. You may leave the wizard after the repository connection is established.
+3. Create one production PostgreSQL 18 cluster named exactly `naee-parvaz-db` in Bangalore (`blr1`) with one `db-s-1vcpu-1gb` node. Review and approve the displayed recurring database price before confirming.
+4. Install and authenticate the current [DigitalOcean CLI](https://docs.digitalocean.com/reference/doctl/how-to/install/) with a short-lived token that has only the account, app and database permissions needed for setup.
+5. Validate the app specification from the repository root:
+
+   ```bash
+   doctl apps spec validate .do/app.yaml
+   ```
+
+6. Review the validated region, service size, database binding, environment variables and total recurring price.
+7. Create the app:
+
+   ```bash
+   doctl apps create --spec .do/app.yaml
+   ```
+
+8. Revoke the temporary CLI token after setup is complete. GitHub automatic deployment remains enabled for future pushes to `main`.
 
 The specification binds `DATABASE_URL` to `${database.DATABASE_PRIVATE_URL}`. DigitalOcean injects the actual private connection string at runtime; no database password is committed. DigitalOcean recommends bindable private database URLs when app and database share a VPC. See [database bindable variables](https://docs.digitalocean.com/products/app-platform/how-to/use-environment-variables/).
 

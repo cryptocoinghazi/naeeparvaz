@@ -8,7 +8,7 @@ The production architecture is an Astro Node service on DigitalOcean App Platfor
 
 Prerequisites:
 
-- Node.js 22.22.3 LTS or a newer Node 22 release;
+- Node.js 22.12.0 or a newer Node 22 release;
 - Docker with Docker Compose; and
 - npm 10.8.2 or newer.
 

@@ -8,6 +8,7 @@ databases:
     engine: PG
     version: "18"
     production: true
+    cluster_name: naee-parvaz-db
     db_name: naee_parvaz
     db_user: naee_app
 services:
@@ -43,20 +44,20 @@ services:
       - key: DATABASE_URL
         value: ${database.DATABASE_PRIVATE_URL}
         scope: RUN_TIME
-        type: general
+        type: GENERAL
       - key: ADMIN_EMAIL
         value: editor@naeeparvaz.com
         scope: RUN_TIME
-        type: general
+        type: GENERAL
       - key: CONTACT_FROM_EMAIL
         value: website@send.naeeparvaz.com
         scope: RUN_TIME
-        type: general
+        type: GENERAL
       - key: HOST
         value: 0.0.0.0
         scope: RUN_TIME
-        type: general
+        type: GENERAL
       - key: NODE_ENV
         value: production
         scope: RUN_TIME
-        type: general
+        type: GENERAL

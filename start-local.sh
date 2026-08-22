@@ -10,7 +10,7 @@ TEMP_NODE_BIN="/tmp/naee-node-runtime/node_modules/node/bin/node"
 node_is_supported() {
   "$1" -e '
     const [major, minor, patch] = process.versions.node.split(".").map(Number);
-    const supported = major === 22 && (minor > 22 || (minor === 22 && patch >= 3));
+    const supported = major === 22 && (minor > 12 || (minor === 12 && patch >= 0));
     process.exit(supported ? 0 : 1);
   ' >/dev/null 2>&1
 }
@@ -39,7 +39,7 @@ select_node() {
 }
 
 if ! NODE_BIN="$(select_node)"; then
-  printf '%s\n' "Naee Parvaz requires Node.js 22.22.3 or newer."
+  printf '%s\n' "Naee Parvaz requires Node.js 22.12.0 or newer within the Node 22 release line."
   printf '%s\n' "Install the current Node 22 LTS release, open a new terminal, and run this script again."
   printf '%s\n' "If using nvm: nvm install 22 && nvm use 22"
   exit 1
