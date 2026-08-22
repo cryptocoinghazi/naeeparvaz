@@ -2,6 +2,7 @@ import type { APIRoute } from "astro";
 import { isLocale, localePath } from "../../data/i18n";
 import { getRuntimeEnv } from "../../lib/runtime";
 import { getSiteSettings } from "../../lib/site-repository";
+import { verifyTurnstile } from "../../lib/turnstile";
 import { escapeHtml, optionalText, requiredText, validEmail } from "../../lib/validation";
 
 const categories = new Set(["editorial", "correction", "news-tip", "partnership", "general"]);
@@ -29,22 +30,8 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
     const message = requiredText(form.get("message"), "Message", 20, 5000);
     const env = getRuntimeEnv(locals);
 
-    if (!import.meta.env.DEV || env.TURNSTILE_SECRET_KEY) {
-      const token = typeof form.get("cf-turnstile-response") === "string" ? String(form.get("cf-turnstile-response")) : "";
-      if (!env.TURNSTILE_SECRET_KEY || !token) throw new Error("Human verification is required.");
-      const verification = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          secret: env.TURNSTILE_SECRET_KEY,
-          response: token,
-          remoteip: request.headers.get("CF-Connecting-IP") ?? undefined,
-          idempotency_key: crypto.randomUUID(),
-        }),
-      });
-      const result = await verification.json<{ success?: boolean; action?: string }>();
-      if (!result.success || (result.action && result.action !== "contact")) throw new Error("Human verification failed.");
-    }
+    const token = typeof form.get("cf-turnstile-response") === "string" ? String(form.get("cf-turnstile-response")) : "";
+    await verifyTurnstile(request, token, "contact");
 
     if (!env.RESEND_API_KEY) throw new Error("Email delivery is not configured.");
     const settings = await getSiteSettings(locals);

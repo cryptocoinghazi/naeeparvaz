@@ -199,12 +199,24 @@ test("public video library exposes working platform filters", async ({ page }, t
   await expect(page.locator('a[href="/en/videos/?platform=facebook"]')).toHaveAttribute("aria-current", "page");
 });
 
-test("the production preview rejects admin access without Cloudflare Access", async ({ request }, testInfo) => {
+test("the production preview protects both the editor and editor APIs", async ({ request, page }, testInfo) => {
   test.skip(testInfo.project.name !== "desktop-1440", "One access-control smoke test is enough");
   const response = await request.get("/editor/", { maxRedirects: 0 });
-  expect(response.status()).toBe(503);
+  expect(response.status()).toBe(302);
   expect(response.headers()["x-robots-tag"]).toBe("noindex, nofollow");
-  expect(await response.text()).toContain("Admin authentication is not configured");
+  expect(response.headers().location).toMatch(/^\/editor\/login\//);
+
+  const apiResponse = await request.post("/api/editor/settings/", {
+    form: { section: "contact" },
+    headers: { Origin: "http://127.0.0.1:4321" },
+  });
+  expect(apiResponse.status()).toBe(401);
+  expect(apiResponse.headers()["x-robots-tag"]).toBe("noindex, nofollow");
+
+  await page.goto("/editor/login/");
+  await expect(page.getByRole("heading", { level: 1, name: "Naee Parvaz control desk" })).toBeVisible();
+  await expect(page.locator('form[action="/api/auth/request-code/"]')).toHaveCount(1);
+  await expect(page.getByRole("button", { name: "Send one-time code" })).toBeDisabled();
 });
 
 test("mobile navigation exposes its state and restores focus", async ({ page }, testInfo) => {

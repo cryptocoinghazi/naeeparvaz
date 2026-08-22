@@ -1,57 +1,49 @@
 import { defineMiddleware } from "astro:middleware";
-import { createRemoteJWKSet, jwtVerify } from "jose";
 import { isLocale } from "./data/i18n";
-import { getRuntimeEnv } from "./lib/runtime";
+import { getAdminSessionEmail, sessionCookieName } from "./lib/auth";
 
 const protectedPrefixes = ["/editor", "/api/editor"];
-const keySets = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
+const publicEditorPaths = new Set(["/editor/login", "/editor/login/"]);
 
-function unauthorized(message: string, status = 401): Response {
+function matchesPrefix(pathname: string, prefix: string): boolean {
+  return pathname === prefix || pathname.startsWith(`${prefix}/`);
+}
+
+function unauthorized(message: string): Response {
   return new Response(message, {
-    status,
-    headers: { "Content-Type": "text/plain; charset=utf-8", "X-Robots-Tag": "noindex, nofollow" },
+    status: 401,
+    headers: {
+      "Content-Type": "text/plain; charset=utf-8",
+      "Cache-Control": "no-store",
+      "X-Robots-Tag": "noindex, nofollow",
+    },
   });
 }
 
 export const onRequest = defineMiddleware(async (context, next) => {
   const { pathname, hostname, protocol } = context.url;
-  const protectedRoute = protectedPrefixes.some((prefix) => pathname.startsWith(prefix));
+  if (!import.meta.env.DEV && hostname === "www.naeeparvaz.com") {
+    const canonical = new URL(context.url);
+    canonical.hostname = "naeeparvaz.com";
+    return context.redirect(canonical.toString(), 308);
+  }
+
+  const editorPath = protectedPrefixes.some((prefix) => matchesPrefix(pathname, prefix));
+  const publicEditorPath = publicEditorPaths.has(pathname);
+  const protectedRoute = editorPath && !publicEditorPath;
 
   if (protectedRoute) {
-    const env = getRuntimeEnv(context.locals);
-    const loopback = ["localhost", "127.0.0.1"].includes(hostname);
-    const localDevelopment = import.meta.env.DEV && loopback;
-    const suppliedLocalToken = context.request.headers.get("X-Naee-Local-Admin");
-    const localPreview = loopback
-      && Boolean(env.LOCAL_ADMIN_TOKEN)
-      && suppliedLocalToken === env.LOCAL_ADMIN_TOKEN;
-    if (localDevelopment || localPreview) {
-      context.locals.adminEmail = env.ADMIN_EMAIL ?? "editor@naeeparvaz.com";
-    } else {
-      const teamDomain = env.CF_ACCESS_TEAM_DOMAIN?.replace(/^https?:\/\//, "").replace(/\/$/, "");
-      const audience = env.CF_ACCESS_AUD;
-      const adminEmail = (env.ADMIN_EMAIL ?? "editor@naeeparvaz.com").toLowerCase();
-      if (!teamDomain || !audience) return unauthorized("Admin authentication is not configured.", 503);
-      const token = context.request.headers.get("Cf-Access-Jwt-Assertion");
-      if (!token) return unauthorized("Cloudflare Access authentication is required.");
-      try {
-        let keySet = keySets.get(teamDomain);
-        if (!keySet) {
-          keySet = createRemoteJWKSet(new URL(`https://${teamDomain}/cdn-cgi/access/certs`));
-          keySets.set(teamDomain, keySet);
-        }
-        const { payload } = await jwtVerify(token, keySet, {
-          issuer: `https://${teamDomain}`,
-          audience,
-        });
-        const email = typeof payload.email === "string" ? payload.email.toLowerCase() : "";
-        if (email !== adminEmail) return unauthorized("This account is not authorized.", 403);
-        context.locals.adminEmail = email;
-      } catch (error) {
-        console.error("Cloudflare Access validation failed", error);
-        return unauthorized("The admin session is invalid or expired.");
-      }
+    const token = context.cookies.get(sessionCookieName())?.value;
+    const email = await getAdminSessionEmail(context.locals, token);
+    if (!email) {
+      if (matchesPrefix(pathname, "/api/editor")) return unauthorized("Admin authentication is required.");
+      const nextPath = `${pathname}${context.url.search}`;
+      const redirect = context.redirect(`/editor/login/?next=${encodeURIComponent(nextPath)}`, 302);
+      redirect.headers.set("Cache-Control", "no-store");
+      redirect.headers.set("X-Robots-Tag", "noindex, nofollow");
+      return redirect;
     }
+    context.locals.adminEmail = email;
   }
 
   const response = await next();
@@ -64,6 +56,17 @@ export const onRequest = defineMiddleware(async (context, next) => {
       secure: protocol === "https:",
     });
   }
-  if (protectedRoute) response.headers.set("X-Robots-Tag", "noindex, nofollow");
+
+  const sensitiveRoute = editorPath || matchesPrefix(pathname, "/api/auth");
+  if (sensitiveRoute) {
+    response.headers.set("Cache-Control", "no-store");
+    response.headers.set("X-Robots-Tag", "noindex, nofollow");
+    response.headers.set("X-Frame-Options", "DENY");
+  }
+  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  response.headers.set("X-Content-Type-Options", "nosniff");
+  if (!import.meta.env.DEV) {
+    response.headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  }
   return response;
 });

@@ -1,6 +1,6 @@
 import { defaultSiteSettings, defaultSocialLinks } from "../data/site";
 import type { EditableSiteSettings, EditableSocialLink, SocialPlatform } from "../types/content";
-import { getDatabase } from "./runtime";
+import { getDatabase, timestamp, withTransaction } from "./database";
 
 interface SiteSettingsRow {
   editor_name: string;
@@ -9,14 +9,14 @@ interface SiteSettingsRow {
   email: string;
   phone_display: string;
   phone_href: string;
-  updated_at: string;
+  updated_at: Date | string;
 }
 
 interface SocialRow {
   platform: SocialPlatform;
   identity: string;
   url: string | null;
-  enabled: number;
+  enabled: boolean;
   display_order: number;
 }
 
@@ -25,7 +25,7 @@ export async function getSiteSettings(locals: App.Locals): Promise<EditableSiteS
   if (!db) return { ...defaultSiteSettings };
 
   try {
-    const row = await db.prepare("SELECT * FROM site_settings WHERE id = 1").first<SiteSettingsRow>();
+    const row = (await db.query<SiteSettingsRow>("SELECT * FROM site_settings WHERE id = 1")).rows[0];
     if (!row) return { ...defaultSiteSettings };
     return {
       editorName: row.editor_name,
@@ -34,7 +34,7 @@ export async function getSiteSettings(locals: App.Locals): Promise<EditableSiteS
       email: row.email,
       phoneDisplay: row.phone_display,
       phoneHref: row.phone_href,
-      updatedAt: row.updated_at,
+      updatedAt: timestamp(row.updated_at),
     };
   } catch (error) {
     console.error("Unable to read site settings", error);
@@ -47,13 +47,13 @@ export async function getSocialLinks(locals: App.Locals): Promise<EditableSocial
   if (!db) return defaultSocialLinks.map((social) => ({ ...social }));
 
   try {
-    const result = await db.prepare("SELECT * FROM social_links ORDER BY display_order").all<SocialRow>();
-    if (!result.results.length) return defaultSocialLinks.map((social) => ({ ...social }));
-    return result.results.map((row) => ({
+    const result = await db.query<SocialRow>("SELECT * FROM social_links ORDER BY display_order");
+    if (!result.rows.length) return defaultSocialLinks.map((social) => ({ ...social }));
+    return result.rows.map((row) => ({
       platform: row.platform,
       identity: row.identity,
       url: row.url ?? undefined,
-      enabled: row.enabled === 1,
+      enabled: row.enabled,
       displayOrder: row.display_order,
     }));
   } catch (error) {
@@ -64,12 +64,12 @@ export async function getSocialLinks(locals: App.Locals): Promise<EditableSocial
 
 export async function updateSiteSettings(locals: App.Locals, settings: EditableSiteSettings): Promise<void> {
   const db = getDatabase(locals);
-  if (!db) throw new Error("The D1 database binding is unavailable.");
+  if (!db) throw new Error("The PostgreSQL DATABASE_URL is unavailable.");
 
-  await db.prepare(`
+  await db.query(`
     INSERT INTO site_settings (
       id, editor_name, editor_title_en, editor_title_hi, email, phone_display, phone_href, updated_at
-    ) VALUES (1, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    ) VALUES (1, $1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
     ON CONFLICT(id) DO UPDATE SET
       editor_name = excluded.editor_name,
       editor_title_en = excluded.editor_title_en,
@@ -78,36 +78,31 @@ export async function updateSiteSettings(locals: App.Locals, settings: EditableS
       phone_display = excluded.phone_display,
       phone_href = excluded.phone_href,
       updated_at = CURRENT_TIMESTAMP
-  `).bind(
+  `, [
     settings.editorName,
     settings.editorTitleEn,
     settings.editorTitleHi,
     settings.email,
     settings.phoneDisplay,
     settings.phoneHref,
-  ).run();
+  ]);
 }
 
 export async function updateSocialLinks(locals: App.Locals, socials: EditableSocialLink[]): Promise<void> {
-  const db = getDatabase(locals);
-  if (!db) throw new Error("The D1 database binding is unavailable.");
-
-  await db.batch(socials.map((social) => db.prepare(`
-    INSERT INTO social_links (platform, identity, url, enabled, display_order, updated_at)
-    VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-    ON CONFLICT(platform) DO UPDATE SET
-      identity = excluded.identity,
-      url = excluded.url,
-      enabled = excluded.enabled,
-      display_order = excluded.display_order,
-      updated_at = CURRENT_TIMESTAMP
-  `).bind(
-    social.platform,
-    social.identity,
-    social.url || null,
-    social.enabled ? 1 : 0,
-    social.displayOrder,
-  )));
+  await withTransaction(locals, async (client) => {
+    for (const social of socials) {
+      await client.query(`
+        INSERT INTO social_links (platform, identity, url, enabled, display_order, updated_at)
+        VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
+        ON CONFLICT(platform) DO UPDATE SET
+          identity = excluded.identity,
+          url = excluded.url,
+          enabled = excluded.enabled,
+          display_order = excluded.display_order,
+          updated_at = CURRENT_TIMESTAMP
+      `, [social.platform, social.identity, social.url || null, social.enabled, social.displayOrder]);
+    }
+  });
 }
 
 export const socialPlatformLabels: Record<SocialPlatform, string> = {

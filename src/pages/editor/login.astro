@@ -1,0 +1,80 @@
+---
+import {
+  getAdminSessionEmail,
+  safeEditorNext,
+  sessionCookieName,
+} from "../../lib/auth";
+import { getRuntimeEnv } from "../../lib/runtime";
+import "../../styles/global.css";
+import "../../styles/admin.css";
+
+const existingSession = await getAdminSessionEmail(
+  Astro.locals,
+  Astro.cookies.get(sessionCookieName())?.value,
+);
+if (existingSession) return Astro.redirect("/editor/", 302);
+
+const step = Astro.url.searchParams.get("step") === "verify" ? "verify" : "request";
+const nextPath = safeEditorNext(Astro.url.searchParams.get("next"));
+const error = Astro.url.searchParams.get("error");
+const sent = Astro.url.searchParams.get("sent") === "1";
+const signedOut = Astro.url.searchParams.get("signedOut") === "1";
+const turnstileSiteKey = getRuntimeEnv(Astro.locals).TURNSTILE_SITE_KEY;
+const canRequestCode = import.meta.env.DEV || Boolean(turnstileSiteKey);
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="theme-color" content="#082f78" />
+    <title>Editor sign in | Naee Parvaz News</title>
+  </head>
+  <body class="admin-body admin-login-body">
+    <a class="skip-link" href="#login-content">Skip to sign in</a>
+    <main id="login-content" class="admin-login-shell">
+      <section class="admin-login-card" aria-labelledby="login-heading">
+        <p class="kicker">Protected website editor</p>
+        <h1 id="login-heading">Naee Parvaz control desk</h1>
+        <p>Only the authorized editorial email can receive a one-time sign-in code.</p>
+
+        {signedOut && <p class="admin-notice admin-notice-success" role="status">You have been signed out.</p>}
+        {error === "rate" && <p class="admin-notice admin-notice-error" role="alert">Too many requests. Wait 15 minutes before trying again.</p>}
+        {error === "request" && <p class="admin-notice admin-notice-error" role="alert">The code could not be sent. Check the configuration or try again.</p>}
+        {error === "code" && <p class="admin-notice admin-notice-error" role="alert">That code is invalid or expired. Request a new code if needed.</p>}
+
+        {step === "request" ? (
+          <form class="admin-form admin-login-form" method="post" action="/api/auth/request-code/">
+            <input type="hidden" name="next" value={nextPath} />
+            <label>
+              Editorial email
+              <input name="email" type="email" autocomplete="email" required maxlength="254" value="editor@naeeparvaz.com" />
+            </label>
+            {turnstileSiteKey ? (
+              <div class="cf-turnstile" data-sitekey={turnstileSiteKey} data-action="admin-login"></div>
+            ) : !import.meta.env.DEV ? (
+              <p class="admin-notice admin-notice-error" role="alert">Admin sign-in is not fully configured.</p>
+            ) : null}
+            <button class="button" type="submit" disabled={!canRequestCode}>Send one-time code</button>
+          </form>
+        ) : (
+          <form class="admin-form admin-login-form" method="post" action="/api/auth/verify-code/">
+            <input type="hidden" name="next" value={nextPath} />
+            {sent && <p class="admin-notice admin-notice-success" role="status">If the address is authorized, a code has been sent. It expires in 10 minutes.</p>}
+            <label>
+              One-time code
+              <input name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6,12}" minlength="6" maxlength="12" required autofocus />
+            </label>
+            <button class="button" type="submit">Verify and sign in</button>
+            <a href={`/editor/login/?next=${encodeURIComponent(nextPath)}`}>Request another code</a>
+          </form>
+        )}
+
+        <p class="admin-login-home"><a href="/en/">← Return to the website</a></p>
+      </section>
+    </main>
+    {turnstileSiteKey && step === "request" && <script is:inline src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>}
+  </body>
+</html>

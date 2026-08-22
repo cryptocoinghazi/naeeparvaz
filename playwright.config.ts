@@ -20,9 +20,14 @@ export default defineConfig({
     trace: "retain-on-failure",
   },
   webServer: {
-    command: "npm run preview -- --host 127.0.0.1 --port 4321",
+    command: "npm run preview",
     url: "http://127.0.0.1:4321",
     reuseExistingServer: true,
+    env: {
+      ...process.env,
+      HOST: "127.0.0.1",
+      PORT: "4321",
+    },
   },
   projects: viewports.map(({ name, width, height }) => ({
     name,

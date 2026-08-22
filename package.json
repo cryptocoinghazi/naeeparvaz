@@ -4,36 +4,35 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=22.12.0",
+    "node": "^22.22.3",
     "npm": ">=10.8.2"
   },
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
-    "preview": "astro preview",
-    "cf:typegen": "wrangler types",
-    "db:migrate:local": "wrangler d1 migrations apply naee-parvaz --local",
-    "db:migrate:remote": "wrangler d1 migrations apply naee-parvaz --remote",
+    "preview": "node ./dist/server/entry.mjs",
+    "start": "node scripts/start-production.mjs",
+    "db:migrate": "node --env-file-if-exists=.env scripts/migrate.mjs",
+    "local:credentials": "node scripts/bootstrap-local.mjs",
     "lint": "eslint .",
     "typecheck": "astro check",
     "check": "npm run lint && npm run typecheck",
     "test": "playwright test"
   },
   "dependencies": {
-    "@astrojs/cloudflare": "^14.2.1",
+    "@astrojs/node": "^11.1.4",
     "@astrojs/sitemap": "^3.7.3",
-    "astro": "^7.2.2",
-    "jose": "^6.2.9"
+    "astro": "^7.2.4",
+    "pg": "^8.23.0"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.10",
     "@axe-core/playwright": "^4.13.0",
-    "@cloudflare/workers-types": "^5.20260818.1",
     "@playwright/test": "^1.62.1",
+    "@types/pg": "^8.23.1",
     "eslint": "^10.8.1",
     "eslint-plugin-astro": "^3.1.0",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.67.0",
-    "wrangler": "^4.123.0"
+    "typescript-eslint": "^8.67.0"
   }
 }

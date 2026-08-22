@@ -2,9 +2,9 @@ node_modules/
 .astro/
 dist/
 .wrangler/
-.dev.vars
-.env
-.env.local
+.env*
+!.env.example
+.data/
 playwright-report/
 test-results/
 .DS_Store

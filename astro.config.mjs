@@ -1,5 +1,5 @@
 import { defineConfig } from "astro/config";
-import cloudflare from "@astrojs/cloudflare";
+import node from "@astrojs/node";
 import sitemap from "@astrojs/sitemap";
 
 const publicPages = ["", "about/", "vision-mission/", "contact/", "videos/"];
@@ -10,11 +10,7 @@ const canonicalPages = ["en", "hi"].flatMap((locale) =>
 export default defineConfig({
   site: "https://naeeparvaz.com",
   output: "server",
-  adapter: cloudflare({
-    platformProxy: {
-      enabled: true,
-    },
-  }),
+  adapter: node({ mode: "standalone" }),
   trailingSlash: "always",
   i18n: {
     defaultLocale: "en",
@@ -23,6 +19,11 @@ export default defineConfig({
   },
   security: {
     checkOrigin: true,
+    allowedDomains: [
+      { hostname: "naeeparvaz.com", protocol: "https" },
+      { hostname: "www.naeeparvaz.com", protocol: "https" },
+      { hostname: "*.ondigitalocean.app", protocol: "https" },
+    ],
   },
   integrations: [
     sitemap({

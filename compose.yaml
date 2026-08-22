@@ -1,0 +1,20 @@
+services:
+  database:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: naee_parvaz
+      POSTGRES_USER: naee
+      POSTGRES_PASSWORD: local-development-only
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - naee-parvaz-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U naee -d naee_parvaz"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  naee-parvaz-postgres:

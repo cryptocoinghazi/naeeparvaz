@@ -1,0 +1,62 @@
+alerts:
+  - rule: DEPLOYMENT_FAILED
+  - rule: DOMAIN_FAILED
+name: naee-parvaz
+region: blr
+databases:
+  - name: database
+    engine: PG
+    version: "18"
+    production: true
+    db_name: naee_parvaz
+    db_user: naee_app
+services:
+  - name: web
+    github:
+      repo: cryptocoinghazi/naeeparvaz
+      branch: main
+      deploy_on_push: true
+    source_dir: /
+    environment_slug: node-js
+    build_command: npm ci && npm run build
+    run_command: npm start
+    http_port: 8080
+    instance_count: 1
+    instance_size_slug: apps-s-1vcpu-0.5gb
+    routes:
+      - path: /
+    health_check:
+      http_path: /api/health/
+      initial_delay_seconds: 20
+      period_seconds: 10
+      timeout_seconds: 5
+      success_threshold: 1
+      failure_threshold: 5
+    liveness_health_check:
+      http_path: /api/health/
+      initial_delay_seconds: 30
+      period_seconds: 30
+      timeout_seconds: 5
+      success_threshold: 1
+      failure_threshold: 5
+    envs:
+      - key: DATABASE_URL
+        value: ${database.DATABASE_PRIVATE_URL}
+        scope: RUN_TIME
+        type: general
+      - key: ADMIN_EMAIL
+        value: editor@naeeparvaz.com
+        scope: RUN_TIME
+        type: general
+      - key: CONTACT_FROM_EMAIL
+        value: website@send.naeeparvaz.com
+        scope: RUN_TIME
+        type: general
+      - key: HOST
+        value: 0.0.0.0
+        scope: RUN_TIME
+        type: general
+      - key: NODE_ENV
+        value: production
+        scope: RUN_TIME
+        type: general

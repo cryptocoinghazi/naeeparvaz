@@ -1,14 +1,11 @@
 /// <reference types="astro/client" />
-/// <reference types="@cloudflare/workers-types" />
-
-interface CloudflareEnv {
-  DB?: D1Database;
+interface RuntimeEnv {
   ADMIN_EMAIL?: string;
-  CF_ACCESS_AUD?: string;
-  CF_ACCESS_TEAM_DOMAIN?: string;
   CONTACT_FROM_EMAIL?: string;
-  LOCAL_ADMIN_TOKEN?: string;
+  DATABASE_URL?: string;
+  LOCAL_ADMIN_CODE?: string;
   RESEND_API_KEY?: string;
+  SESSION_SECRET?: string;
   TURNSTILE_SECRET_KEY?: string;
   TURNSTILE_SITE_KEY?: string;
 }

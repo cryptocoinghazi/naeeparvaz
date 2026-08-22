@@ -40,6 +40,50 @@
   gap: 0.75rem;
 }
 
+.admin-logout-form {
+  margin: 0;
+}
+
+.admin-login-body {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at 15% 10%, rgb(14 165 233 / 16%), transparent 30rem),
+    var(--paper-soft);
+}
+
+.admin-login-shell {
+  width: min(calc(100% - 2rem), 34rem);
+  padding-block: 3rem;
+}
+
+.admin-login-card {
+  padding: clamp(1.5rem, 5vw, 3rem);
+  border-top: 0.35rem solid var(--red-700);
+  background: var(--white);
+  box-shadow: 0 1.25rem 4rem rgb(8 47 120 / 16%);
+}
+
+.admin-login-card h1 {
+  margin-block: 0.5rem 0.75rem;
+  font-size: clamp(2rem, 8vw, 3rem);
+}
+
+.admin-login-form {
+  margin-top: 1.5rem;
+}
+
+.admin-login-form .button {
+  justify-self: start;
+}
+
+.admin-login-home {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+
 .admin-button-outline {
   border-color: rgb(255 255 255 / 60%);
   color: var(--white);

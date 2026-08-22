@@ -40,13 +40,16 @@ const today = new Intl.DateTimeFormat("en-CA", {
         <nav aria-label="Admin shortcuts">
           <a class="button button-light" href="/en/" target="_blank" rel="noopener">View website</a>
           <a class="button button-outline admin-button-outline" href="#new-video">Add video</a>
+          <form class="admin-logout-form" method="post" action="/api/auth/logout/">
+            <button class="button button-outline admin-button-outline" type="submit">Sign out</button>
+          </form>
         </nav>
       </div>
     </header>
 
     <main id="admin-content" class="admin-container admin-main">
       {saved && <p class="admin-notice admin-notice-success" role="status">Changes saved successfully.</p>}
-      {error && <p class="admin-notice admin-notice-error" role="alert">The update could not be saved. Check every field and confirm the local/production database is configured.</p>}
+      {error && <p class="admin-notice admin-notice-error" role="alert">The update could not be saved. Check every field and confirm PostgreSQL is available.</p>}
 
       <section class="admin-section" aria-labelledby="contact-settings-heading">
         <div class="admin-section-heading">
