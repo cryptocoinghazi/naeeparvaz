@@ -1,0 +1,25 @@
+---
+import VideoLibrary from "../../components/VideoLibrary.astro";
+import { getCopy, isLocale, localePath } from "../../data/i18n";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { getPublishedVideos } from "../../lib/video-repository";
+import { createVideoLibraryView } from "../../lib/video-library";
+
+const localeParam = Astro.params.locale;
+if (!isLocale(localeParam)) return new Response("Not found", { status: 404 });
+const locale = localeParam;
+const copy = getCopy(locale);
+const videos = await getPublishedVideos(Astro.locals, locale);
+const library = createVideoLibraryView(
+  videos,
+  Astro.url.searchParams.get("platform"),
+  Astro.url.searchParams.get("page"),
+);
+---
+
+<BaseLayout locale={locale} title={copy.seo.videosTitle} description={copy.seo.videosDescription} canonicalPath={localePath(locale, "videos")}>
+  <section class="page-hero" aria-labelledby="videos-heading">
+    <div class="container page-hero-inner"><p class="kicker">{copy.videos.kicker}</p><h1 id="videos-heading">{copy.videos.title}</h1><p>{copy.videos.lead}</p></div>
+  </section>
+  <VideoLibrary locale={locale} library={library} />
+</BaseLayout>

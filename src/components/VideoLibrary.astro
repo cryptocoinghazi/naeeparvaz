@@ -1,0 +1,117 @@
+---
+import { getCopy, localePath } from "../data/i18n";
+import { providerLabels } from "../lib/video";
+import { videoLibraryProviders, type VideoLibraryView } from "../lib/video-library";
+import type { Locale, VideoProvider } from "../types/content";
+import VideoCard from "./VideoCard.astro";
+
+interface Props {
+  locale: Locale;
+  library: VideoLibraryView;
+}
+
+const { locale, library } = Astro.props;
+const copy = getCopy(locale);
+const basePath = localePath(locale, "videos");
+
+function libraryUrl(provider: VideoProvider | undefined, page = 1): string {
+  const params = new URLSearchParams();
+  if (provider) params.set("platform", provider);
+  if (page > 1) params.set("page", String(page));
+  const query = params.toString();
+  return query ? `${basePath}?${query}` : basePath;
+}
+
+const filterOptions: Array<{ provider?: VideoProvider; label: string; count: number }> = [
+  { label: copy.videos.allPlatforms, count: library.counts.all },
+  ...videoLibraryProviders.map((provider) => ({
+    provider,
+    label: providerLabels[provider],
+    count: library.counts[provider],
+  })),
+];
+
+const numberedPages: Array<number | "ellipsis"> = [];
+let previousVisiblePage = 0;
+for (let page = 1; page <= library.totalPages; page += 1) {
+  const visible = page === 1 || page === library.totalPages || Math.abs(page - library.currentPage) <= 1;
+  if (!visible) continue;
+  if (previousVisiblePage && page - previousVisiblePage > 1) numberedPages.push("ellipsis");
+  numberedPages.push(page);
+  previousVisiblePage = page;
+}
+---
+
+<section class="section video-library" aria-labelledby="video-library-heading">
+  <div class="container">
+    <div class="video-library-heading">
+      <div>
+        <p class="kicker">{copy.videos.libraryKicker}</p>
+        <h2 id="video-library-heading">{copy.videos.libraryTitle}</h2>
+      </div>
+      <p class="video-library-summary" role="status">
+        {copy.videos.showing}{" "}<strong>{library.firstVisible}–{library.lastVisible}</strong>{" "}
+        {copy.videos.of}{" "}<strong>{library.totalVideos}</strong>{" "}{copy.videos.videoCountLabel}
+      </p>
+    </div>
+
+    <nav class="video-filters" aria-label={copy.videos.filterLabel}>
+      {filterOptions.map((filter) => {
+        const active = filter.provider === library.activeProvider;
+        return (
+          <a
+            class:list={["video-filter", { "is-active": active }]}
+            href={libraryUrl(filter.provider)}
+            aria-current={active ? "page" : undefined}
+          >
+            <span>{filter.label}</span>
+            <strong>{filter.count}</strong>
+          </a>
+        );
+      })}
+    </nav>
+
+    {library.videos.length ? (
+      <div class="video-library-grid">
+        {library.videos.map((video) => <VideoCard video={video} locale={locale} />)}
+      </div>
+    ) : (
+      <div class="video-empty video-library-empty">
+        <p class="kicker">{copy.videos.allPlatforms}</p>
+        <h2>{copy.videos.filteredEmptyTitle}</h2>
+        <p>{copy.videos.filteredEmptyText}</p>
+      </div>
+    )}
+
+    {library.totalPages > 1 && (
+      <nav class="video-pagination" aria-label={copy.videos.paginationLabel}>
+        {library.currentPage > 1 ? (
+          <a class="video-page-direction" href={libraryUrl(library.activeProvider, library.currentPage - 1)} rel="prev">
+            <span aria-hidden="true">←</span> {copy.videos.previousPage}
+          </a>
+        ) : (
+          <span class="video-page-direction is-disabled" aria-disabled="true"><span aria-hidden="true">←</span> {copy.videos.previousPage}</span>
+        )}
+        <div class="video-page-numbers">
+          {numberedPages.map((page) => page === "ellipsis" ? (
+            <span class="video-page-ellipsis" aria-hidden="true">…</span>
+          ) : (
+            <a
+              href={libraryUrl(library.activeProvider, page)}
+              class:list={["video-page-number", { "is-active": page === library.currentPage }]}
+              aria-current={page === library.currentPage ? "page" : undefined}
+              aria-label={`${copy.videos.pageLabel} ${page}`}
+            >{page}</a>
+          ))}
+        </div>
+        {library.currentPage < library.totalPages ? (
+          <a class="video-page-direction" href={libraryUrl(library.activeProvider, library.currentPage + 1)} rel="next">
+            {copy.videos.nextPage} <span aria-hidden="true">→</span>
+          </a>
+        ) : (
+          <span class="video-page-direction is-disabled" aria-disabled="true">{copy.videos.nextPage} <span aria-hidden="true">→</span></span>
+        )}
+      </nav>
+    )}
+  </div>
+</section>

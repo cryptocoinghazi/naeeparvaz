@@ -1,0 +1,73 @@
+---
+import { getCopy } from "../data/i18n";
+import { providerLabels, videoEmbedUrl, videoThumbnail } from "../lib/video";
+import type { Locale, ResolvedVideo } from "../types/content";
+
+interface Props {
+  video: ResolvedVideo;
+  locale: Locale;
+  featured?: boolean;
+}
+
+const { video, locale, featured = false } = Astro.props;
+const copy = getCopy(locale);
+const embedUrl = videoEmbedUrl(video);
+const thumbnail = videoThumbnail(video);
+const provider = providerLabels[video.provider];
+const date = new Intl.DateTimeFormat(locale === "hi" ? "hi-IN" : "en-IN", {
+  dateStyle: "medium",
+  timeZone: "Asia/Kolkata",
+}).format(new Date(video.publishedAt));
+---
+
+<article class:list={["video-card", { "video-card-featured": featured }]}>
+  <div class="video-frame" data-video-frame>
+    <button
+      class="video-play"
+      type="button"
+      data-video-play
+      data-embed-url={embedUrl}
+      data-video-title={video.title}
+      aria-label={`${copy.common.watch}: ${video.title}`}
+    >
+      {thumbnail ? (
+        <img src={thumbnail} width="480" height="360" alt="" loading="lazy" decoding="async" />
+      ) : (
+        <span class="video-provider-placeholder" aria-hidden="true">{provider}</span>
+      )}
+      <span class="video-play-icon" aria-hidden="true">▶</span>
+    </button>
+  </div>
+  <div class="video-card-copy">
+    <div class="video-meta">
+      <span>{provider}</span>
+      <time datetime={video.publishedAt}>{date}</time>
+      {featured && <strong>{copy.common.featured}</strong>}
+    </div>
+    <h3>{video.title}</h3>
+    {video.description && <p>{video.description}</p>}
+    <a href={video.canonicalUrl} target="_blank" rel="noopener">
+      {copy.common.watchExternal} {provider}<span class="visually-hidden"> ({copy.common.newWindow})</span>
+    </a>
+  </div>
+</article>
+
+<script>
+  document.querySelectorAll<HTMLButtonElement>("[data-video-play]").forEach((button) => {
+    if (button.dataset.bound === "true") return;
+    button.dataset.bound = "true";
+    button.addEventListener("click", () => {
+      const frame = button.closest<HTMLElement>("[data-video-frame]");
+      const src = button.dataset.embedUrl;
+      if (!frame || !src) return;
+      const iframe = document.createElement("iframe");
+      iframe.src = src;
+      iframe.title = button.dataset.videoTitle || "Video player";
+      iframe.loading = "lazy";
+      iframe.allow = "accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
+      iframe.referrerPolicy = "strict-origin-when-cross-origin";
+      iframe.allowFullscreen = true;
+      frame.replaceChildren(iframe);
+    });
+  });
+</script>

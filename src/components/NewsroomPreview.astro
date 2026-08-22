@@ -1,0 +1,38 @@
+---
+import { getCopy } from "../data/i18n";
+import type { Locale } from "../types/content";
+import SectionHeader from "./SectionHeader.astro";
+
+interface Props { locale: Locale }
+const { locale } = Astro.props;
+const copy = getCopy(locale);
+const newsroom = copy.home.newsroom;
+---
+
+<section class="section newsroom-section" id="newsroom" aria-labelledby="newsroom-heading">
+  <div class="container">
+    <div class="launch-strip">
+      <span>{newsroom.label}</span>
+      <p>{newsroom.notice}</p>
+    </div>
+    <div id="newsroom-heading">
+      <SectionHeader
+        kicker={newsroom.kicker}
+        title={newsroom.title}
+        introduction={newsroom.introduction}
+      />
+    </div>
+    <div class="category-grid">
+      {newsroom.categories.map(([name, description], index) => (
+        <article class="category-item">
+          <div class="category-meta">
+            <span>{String(index + 1).padStart(2, "0")}</span>
+            <strong>{copy.common.launchingSoon}</strong>
+          </div>
+          <h3>{name}</h3>
+          <p>{description}</p>
+        </article>
+      ))}
+    </div>
+  </div>
+</section>

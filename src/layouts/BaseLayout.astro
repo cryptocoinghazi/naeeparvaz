@@ -1,0 +1,83 @@
+---
+import SiteFooter from "../components/SiteFooter.astro";
+import SiteHeader from "../components/SiteHeader.astro";
+import { getCopy, switchLocalePath } from "../data/i18n";
+import { siteConfig } from "../data/site";
+import { getSiteSettings, getSocialLinks } from "../lib/site-repository";
+import type { Locale } from "../types/content";
+import "../styles/global.css";
+
+interface Props {
+  locale: Locale;
+  title: string;
+  description: string;
+  canonicalPath: string;
+  socialTitle?: string;
+}
+
+const { locale, title, description, canonicalPath, socialTitle = title } = Astro.props;
+const copy = getCopy(locale);
+const settings = await getSiteSettings(Astro.locals);
+const socials = await getSocialLinks(Astro.locals);
+const canonicalUrl = new URL(canonicalPath, siteConfig.publication.url).toString();
+const alternateLocale: Locale = locale === "en" ? "hi" : "en";
+const alternatePath = switchLocalePath(canonicalPath, alternateLocale);
+const alternateUrl = new URL(alternatePath, siteConfig.publication.url).toString();
+const englishPath = locale === "en" ? canonicalPath : alternatePath;
+const logoUrl = new URL(siteConfig.publication.logoPath, siteConfig.publication.url).toString();
+const bannerUrl = new URL(siteConfig.publication.bannerPath, siteConfig.publication.url).toString();
+const organizationSchema = {
+  "@context": "https://schema.org",
+  "@type": "NewsMediaOrganization",
+  name: siteConfig.publication.name,
+  url: siteConfig.publication.url,
+  logo: logoUrl,
+  email: settings.email,
+  telephone: settings.phoneHref,
+  slogan: siteConfig.publication.motto,
+};
+---
+
+<!doctype html>
+<html lang={locale}>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#082f78" />
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonicalUrl} />
+    <link rel="alternate" hreflang={locale} href={canonicalUrl} />
+    <link rel="alternate" hreflang={alternateLocale} href={alternateUrl} />
+    <link rel="alternate" hreflang="x-default" href={new URL(englishPath, siteConfig.publication.url).toString()} />
+    <link rel="icon" type="image/png" href={siteConfig.publication.logoPath} />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content={copy.common.brandName} />
+    <meta property="og:locale" content={locale === "hi" ? "hi_IN" : "en_IN"} />
+    <meta property="og:locale:alternate" content={locale === "hi" ? "en_IN" : "hi_IN"} />
+    <meta property="og:title" content={socialTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonicalUrl} />
+    <meta property="og:image" content={bannerUrl} />
+    <meta property="og:image:width" content="2172" />
+    <meta property="og:image:height" content="724" />
+    <meta property="og:image:alt" content={`${siteConfig.publication.name} official banner`} />
+
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content={socialTitle} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={bannerUrl} />
+
+    <title>{title}</title>
+    <script is:inline>document.documentElement.classList.add("js");</script>
+    <script is:inline type="application/ld+json" set:html={JSON.stringify(organizationSchema)}></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">{copy.common.skip}</a>
+    <SiteHeader currentPath={Astro.url.pathname} locale={locale} settings={settings} />
+    <main id="main-content" tabindex="-1">
+      <slot />
+    </main>
+    <SiteFooter locale={locale} settings={settings} socials={socials} />
+  </body>
+</html>

@@ -1,0 +1,98 @@
+---
+import ContactCta from "../../components/ContactCta.astro";
+import EditorialList from "../../components/EditorialList.astro";
+import LatestVideos from "../../components/LatestVideos.astro";
+import NewsroomPreview from "../../components/NewsroomPreview.astro";
+import SectionHeader from "../../components/SectionHeader.astro";
+import { getCopy, isLocale, localePath } from "../../data/i18n";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { getSiteSettings } from "../../lib/site-repository";
+import { getPublishedVideos } from "../../lib/video-repository";
+
+const localeParam = Astro.params.locale;
+if (!isLocale(localeParam)) return new Response("Not found", { status: 404 });
+const locale = localeParam;
+const copy = getCopy(locale);
+const settings = await getSiteSettings(Astro.locals);
+const videos = await getPublishedVideos(Astro.locals, locale, 5);
+---
+
+<BaseLayout locale={locale} title={copy.seo.homeTitle} description={copy.seo.homeDescription} canonicalPath={localePath(locale, "home")}>
+  <section class="home-hero" aria-labelledby="home-title">
+    <div class="container home-hero-grid">
+      <div class="hero-copy">
+        <p class="kicker">{copy.home.kicker} <span aria-hidden="true">•</span> <span lang="hi">नई परवाज़ न्यूज़</span></p>
+        <h1 id="home-title">{copy.home.title}</h1>
+        <p class="hero-lead">{copy.home.lead}</p>
+        <div class="hero-actions">
+          <a class="button" href={localePath(locale, "about")}>{copy.home.aboutAction}</a>
+          <a class="text-link" href={localePath(locale, "vision")}>{copy.home.visionAction} <span aria-hidden="true">→</span></a>
+        </div>
+      </div>
+      <aside class="editorial-note" aria-label={copy.home.commitmentLabel}>
+        <p class="editorial-note-label">{copy.home.commitmentLabel}</p>
+        <blockquote>“{copy.home.commitment}”</blockquote>
+        <p>{copy.common.brandName} — {copy.common.editorialFoundation}</p>
+      </aside>
+    </div>
+  </section>
+
+  <section class="identity-band" aria-label={copy.home.identityLabel}>
+    <div class="container identity-grid">
+      <p class="identity-label">{copy.home.identityLabel}</p>
+      <p class="identity-statement">{copy.home.identity}</p>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="about-preview-heading">
+    <div class="container feature-split">
+      <div><p class="kicker">{copy.home.aboutKicker}</p><h2 id="about-preview-heading">{copy.home.aboutTitle}</h2></div>
+      <div class="prose-intro">
+        {copy.home.aboutParagraphs.map((paragraph) => <p>{paragraph}</p>)}
+        <a class="text-link" href={localePath(locale, "about")}>{copy.home.aboutLink} <span aria-hidden="true">→</span></a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section-tint" aria-labelledby="purpose-heading">
+    <div class="container">
+      <div id="purpose-heading"><SectionHeader kicker={copy.home.purposeKicker} title={copy.home.purposeTitle} introduction={copy.home.purposeIntro} /></div>
+      <div class="purpose-grid">
+        {copy.home.purposes.map((purpose, index) => (
+          <article><p class="purpose-number">{String(index + 1).padStart(2, "0")}</p><h3>{purpose.title}</h3><p>{purpose.description}</p></article>
+        ))}
+      </div>
+      <a class="button button-outline section-action" href={localePath(locale, "vision")}>{copy.home.visionAction}</a>
+    </div>
+  </section>
+
+  <section class="section section-dark" aria-labelledby="principles-heading">
+    <div class="container">
+      <div id="principles-heading"><SectionHeader kicker={copy.home.principlesKicker} title={copy.home.principlesTitle} introduction={copy.home.principlesIntro} /></div>
+      <EditorialList items={copy.home.principles} />
+    </div>
+  </section>
+
+  <LatestVideos locale={locale} videos={videos} />
+  <NewsroomPreview locale={locale} />
+
+  <section class="section editor-section" aria-labelledby="editor-heading">
+    <div class="container editor-profile">
+      <div class="editor-monogram" aria-hidden="true">MA</div>
+      <div class="editor-profile-copy">
+        <p class="kicker">{copy.home.editorKicker}</p>
+        <h2 id="editor-heading">{copy.home.editorTitle}</h2>
+        <p>{copy.home.editorText}</p>
+      </div>
+      <div class="editor-details">
+        <p class="editor-role">{copy.contact.editor}</p>
+        <h3>{settings.editorName}</h3>
+        <p lang={locale}>{locale === "hi" ? settings.editorTitleHi : settings.editorTitleEn}</p>
+        <a href={`mailto:${settings.email}`}>{settings.email}</a>
+        <a href={`tel:${settings.phoneHref}`}>{settings.phoneDisplay}</a>
+      </div>
+    </div>
+  </section>
+
+  <ContactCta locale={locale} settings={settings} />
+</BaseLayout>

@@ -1,0 +1,31 @@
+---
+import ContactCta from "../../components/ContactCta.astro";
+import ObjectiveList from "../../components/ObjectiveList.astro";
+import SectionHeader from "../../components/SectionHeader.astro";
+import { getCopy, isLocale, localePath } from "../../data/i18n";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { getSiteSettings } from "../../lib/site-repository";
+
+const localeParam = Astro.params.locale;
+if (!isLocale(localeParam)) return new Response("Not found", { status: 404 });
+const locale = localeParam;
+const copy = getCopy(locale);
+const settings = await getSiteSettings(Astro.locals);
+---
+
+<BaseLayout locale={locale} title={copy.seo.visionTitle} description={copy.seo.visionDescription} canonicalPath={localePath(locale, "vision")}>
+  <section class="page-hero" aria-labelledby="page-title">
+    <div class="container page-hero-inner"><p class="kicker">{copy.vision.kicker}</p><h1 id="page-title">{copy.vision.title}</h1><p>{copy.vision.lead}</p></div>
+  </section>
+  <section class="section" aria-label={copy.vision.title}>
+    <div class="container declaration-list">
+      {copy.vision.declarations.map((item, index) => (
+        <article><p class="declaration-number">{String(index + 1).padStart(2, "0")}</p><div><p class="kicker">{item.kicker}</p><h2>{item.title}</h2><p>{item.description}</p></div></article>
+      ))}
+    </div>
+  </section>
+  <section class="section section-tint" aria-labelledby="objectives-heading">
+    <div class="container"><div id="objectives-heading"><SectionHeader kicker={copy.vision.objectivesKicker} title={copy.vision.objectivesTitle} introduction={copy.vision.objectivesIntro} /></div><ObjectiveList objectives={copy.vision.objectives} /></div>
+  </section>
+  <ContactCta locale={locale} settings={settings} heading={copy.vision.cta} />
+</BaseLayout>

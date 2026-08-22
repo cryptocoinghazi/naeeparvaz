@@ -1,0 +1,168 @@
+---
+import { videoCategories } from "../../data/site";
+import { getSiteSettings, getSocialLinks, socialPlatformLabels } from "../../lib/site-repository";
+import { getAdminVideos } from "../../lib/video-repository";
+import { providerLabels } from "../../lib/video";
+import "../../styles/global.css";
+import "../../styles/admin.css";
+
+const settings = await getSiteSettings(Astro.locals);
+const socials = await getSocialLinks(Astro.locals);
+const videos = await getAdminVideos(Astro.locals);
+const saved = Astro.url.searchParams.get("saved");
+const error = Astro.url.searchParams.get("error");
+const today = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Kolkata",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+}).format(new Date());
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="theme-color" content="#082f78" />
+    <title>Website editor | Naee Parvaz News</title>
+  </head>
+  <body class="admin-body">
+    <a class="skip-link" href="#admin-content">Skip to editor</a>
+    <header class="admin-header">
+      <div class="admin-container admin-header-inner">
+        <div>
+          <p class="kicker">Protected website editor</p>
+          <h1>Naee Parvaz control desk</h1>
+          <p>Signed in as <strong>{Astro.locals.adminEmail}</strong></p>
+        </div>
+        <nav aria-label="Admin shortcuts">
+          <a class="button button-light" href="/en/" target="_blank" rel="noopener">View website</a>
+          <a class="button button-outline admin-button-outline" href="#new-video">Add video</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="admin-content" class="admin-container admin-main">
+      {saved && <p class="admin-notice admin-notice-success" role="status">Changes saved successfully.</p>}
+      {error && <p class="admin-notice admin-notice-error" role="alert">The update could not be saved. Check every field and confirm the local/production database is configured.</p>}
+
+      <section class="admin-section" aria-labelledby="contact-settings-heading">
+        <div class="admin-section-heading">
+          <div><p class="kicker">Contact details</p><h2 id="contact-settings-heading">Editor and newsroom</h2></div>
+          <p>These values update the header, contact page, footer, email recipient and organization metadata.</p>
+        </div>
+        <form class="admin-form" method="post" action="/api/editor/settings/">
+          <input type="hidden" name="section" value="contact" />
+          <div class="admin-form-grid">
+            <label>Editor name<input name="editorName" required minlength="2" maxlength="100" value={settings.editorName} /></label>
+            <label>Editorial email<input name="email" required type="email" maxlength="254" value={settings.email} /></label>
+            <label>English role<input name="editorTitleEn" required minlength="3" maxlength="160" value={settings.editorTitleEn} /></label>
+            <label>Hindi role<input name="editorTitleHi" required minlength="3" maxlength="160" value={settings.editorTitleHi} lang="hi" /></label>
+            <label>Phone number<input name="phoneDisplay" required minlength="8" maxlength="30" value={settings.phoneDisplay} /></label>
+          </div>
+          <button class="button" type="submit">Save contact details</button>
+        </form>
+      </section>
+
+      <section class="admin-section" aria-labelledby="social-settings-heading">
+        <div class="admin-section-heading">
+          <div><p class="kicker">Social identities</p><h2 id="social-settings-heading">Profiles and links</h2></div>
+          <p>An identity can be displayed without a link. Only verified HTTPS URLs on the matching platform are accepted.</p>
+        </div>
+        <form class="admin-form" method="post" action="/api/editor/settings/">
+          <input type="hidden" name="section" value="social" />
+          <div class="admin-social-list">
+            {socials.map((social) => (
+              <fieldset>
+                <legend>{socialPlatformLabels[social.platform]}</legend>
+                <label>
+                  Display identity
+                  <input name={`${social.platform}Identity`} required maxlength="100" value={social.identity} />
+                </label>
+                <label>
+                  Exact profile URL (optional)
+                  <input name={`${social.platform}Url`} type="url" inputmode="url" maxlength="500" value={social.url ?? ""} placeholder="https://…" />
+                </label>
+                <label class="admin-check"><input name={`${social.platform}Enabled`} type="checkbox" checked={social.enabled} /> Show on website</label>
+              </fieldset>
+            ))}
+          </div>
+          <button class="button" type="submit">Save social profiles</button>
+        </form>
+      </section>
+
+      <section class="admin-section" id="new-video" aria-labelledby="new-video-heading">
+        <div class="admin-section-heading">
+          <div><p class="kicker">Video desk</p><h2 id="new-video-heading">Add a video</h2></div>
+          <p>Paste a public YouTube, Instagram or Facebook video link. The website stores only the link and editorial metadata.</p>
+        </div>
+        <form class="admin-form" method="post" action="/api/editor/videos/">
+          <div class="admin-form-grid">
+            <label class="admin-span-2">Public video URL<input name="sourceUrl" required type="url" inputmode="url" maxlength="1000" placeholder="https://www.youtube.com/watch?v=…" /></label>
+            <label>Category<select name="category" required>{videoCategories.map((category) => <option value={category}>{category}</option>)}</select></label>
+            <label>Published date<input name="publishedAt" required type="date" value={today} /></label>
+            <label>English title<input name="titleEn" maxlength="240" /></label>
+            <label lang="hi">हिंदी शीर्षक<input name="titleHi" maxlength="240" lang="hi" /></label>
+            <label>English description<textarea name="descriptionEn" maxlength="1200" rows="4"></textarea></label>
+            <label lang="hi">हिंदी विवरण<textarea name="descriptionHi" maxlength="1200" rows="4" lang="hi"></textarea></label>
+            <label>Status<select name="status"><option value="draft">Draft</option><option value="published">Published</option></select></label>
+            <label class="admin-check admin-check-bottom"><input name="featured" type="checkbox" /> Feature this video</label>
+          </div>
+          <p class="admin-help">At least one title is required. If the other language is empty, the available title is used as a transparent fallback.</p>
+          <button class="button" type="submit">Add video</button>
+        </form>
+      </section>
+
+      <section class="admin-section" aria-labelledby="video-library-heading">
+        <div class="admin-section-heading">
+          <div><p class="kicker">Library</p><h2 id="video-library-heading">Manage videos</h2></div>
+          <p>{videos.length} {videos.length === 1 ? "record" : "records"}. Drafts never appear on the public website.</p>
+        </div>
+        {videos.length ? (
+          <div class="admin-video-list">
+            {videos.map((video) => (
+              <article class="admin-video-record">
+                <div class="admin-record-header">
+                  <div>
+                    <span class:list={["admin-status", `admin-status-${video.status}`]}>{video.status}</span>
+                    <strong>{providerLabels[video.provider]}</strong>
+                    {video.featured && <span class="admin-featured">Featured</span>}
+                    {!video.translations.en && <span class="admin-translation-warning">English title missing</span>}
+                    {!video.translations.hi && <span class="admin-translation-warning">Hindi title missing</span>}
+                  </div>
+                  <a href={video.canonicalUrl} target="_blank" rel="noopener">Open original ↗</a>
+                </div>
+                <form class="admin-form" method="post" action="/api/editor/videos/">
+                  <input type="hidden" name="id" value={video.id} />
+                  <div class="admin-form-grid">
+                    <label class="admin-span-2">Public video URL<input name="sourceUrl" required type="url" maxlength="1000" value={video.sourceUrl} /></label>
+                    <label>Category<select name="category" required>{videoCategories.map((category) => <option value={category} selected={video.category === category}>{category}</option>)}</select></label>
+                    <label>Published date<input name="publishedAt" required type="date" value={video.publishedAt.slice(0, 10)} /></label>
+                    <label>English title<input name="titleEn" maxlength="240" value={video.translations.en?.title ?? ""} /></label>
+                    <label lang="hi">हिंदी शीर्षक<input name="titleHi" maxlength="240" value={video.translations.hi?.title ?? ""} lang="hi" /></label>
+                    <label>English description<textarea name="descriptionEn" maxlength="1200" rows="4">{video.translations.en?.description ?? ""}</textarea></label>
+                    <label lang="hi">हिंदी विवरण<textarea name="descriptionHi" maxlength="1200" rows="4" lang="hi">{video.translations.hi?.description ?? ""}</textarea></label>
+                    <label>Status<select name="status"><option value="draft" selected={video.status === "draft"}>Draft</option><option value="published" selected={video.status === "published"}>Published</option></select></label>
+                    <label class="admin-check admin-check-bottom"><input name="featured" type="checkbox" checked={video.featured} /> Feature this video</label>
+                  </div>
+                  <div class="admin-actions">
+                    <button class="button" type="submit">Save changes</button>
+                  </div>
+                </form>
+                <form method="post" action="/api/editor/video-status/">
+                  <input type="hidden" name="id" value={video.id} />
+                  <input type="hidden" name="status" value={video.status === "published" ? "draft" : "published"} />
+                  <button class="button button-outline" type="submit">{video.status === "published" ? "Unpublish" : "Publish"}</button>
+                </form>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p class="admin-empty">No video records yet. Add the first link above as a draft, review it, then publish it.</p>
+        )}
+      </section>
+    </main>
+  </body>
+</html>

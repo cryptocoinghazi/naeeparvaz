@@ -1,0 +1,21 @@
+# Copy this file to .dev.vars. Never put production secrets in this example.
+
+ADMIN_EMAIL=editor@naeeparvaz.com
+CONTACT_FROM_EMAIL=website@send.naeeparvaz.com
+
+# Cloudflare Access is bypassed only for Astro development on loopback.
+# These can remain blank for normal local browser development.
+CF_ACCESS_AUD=
+CF_ACCESS_TEAM_DOMAIN=
+
+# Optional: generate with `openssl rand -hex 32` only for loopback preview
+# requests that send the X-Naee-Local-Admin header. Never use in production.
+LOCAL_ADMIN_TOKEN=
+
+# Add a newly created Resend key only when testing real local delivery.
+RESEND_API_KEY=
+
+# Official Cloudflare dummy credentials that always pass on localhost.
+# Never copy these test values into the production Worker.
+TURNSTILE_SITE_KEY=1x00000000000000000000AA
+TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA

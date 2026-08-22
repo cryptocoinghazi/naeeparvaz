@@ -1,0 +1,18 @@
+---
+import type { ArticleSummary } from "../types/content";
+
+interface Props {
+  articles: ArticleSummary[];
+}
+
+const { articles } = Astro.props;
+---
+
+<ol class="headline-list">
+  {articles.map((article) => (
+    <li>
+      <span>{article.category}</span>
+      <h3><a href={article.href}>{article.title}</a></h3>
+    </li>
+  ))}
+</ol>

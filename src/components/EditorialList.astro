@@ -1,0 +1,23 @@
+---
+interface EditorialItem {
+  label: string;
+  title: string;
+  description: string;
+}
+
+interface Props {
+  items: EditorialItem[];
+}
+
+const { items } = Astro.props;
+---
+
+<ol class="editorial-list">
+  {items.map((item) => (
+    <li>
+      <p class="editorial-label">{item.label}</p>
+      <h3>{item.title}</h3>
+      <p>{item.description}</p>
+    </li>
+  ))}
+</ol>

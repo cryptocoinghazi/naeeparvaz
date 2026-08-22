@@ -1,0 +1,83 @@
+---
+import { getCopy, localePath } from "../data/i18n";
+import { siteConfig } from "../data/site";
+import { socialPlatformLabels } from "../lib/site-repository";
+import type { EditableSiteSettings, EditableSocialLink, Locale } from "../types/content";
+
+interface Props {
+  locale: Locale;
+  settings: EditableSiteSettings;
+  socials: EditableSocialLink[];
+}
+
+const { locale, settings, socials } = Astro.props;
+const copy = getCopy(locale);
+const navigation = [
+  [copy.common.nav.home, localePath(locale, "home")],
+  [copy.common.nav.videos, localePath(locale, "videos")],
+  [copy.common.nav.about, localePath(locale, "about")],
+  [copy.common.nav.vision, localePath(locale, "vision")],
+  [copy.common.nav.contact, localePath(locale, "contact")],
+];
+---
+
+<footer class="site-footer">
+  <div class="container footer-grid">
+    <div class="footer-brand">
+      <a href={localePath(locale, "home")} aria-label={`${copy.common.brandName} ${copy.common.nav.home}`}>
+        <img
+          src="/assets/naee-parvaz-footer-logo.png"
+          width="700"
+          height="394"
+          alt={copy.common.brandName}
+          loading="lazy"
+          decoding="async"
+        />
+      </a>
+      <p lang="hi" class="footer-motto">{siteConfig.publication.motto}</p>
+      <p>{copy.common.siteDescription}</p>
+    </div>
+
+    <div>
+      <h2>{copy.common.footer.explore}</h2>
+      <ul class="footer-links">
+        {navigation.map(([label, href]) => (
+          <li><a href={href}>{label}</a></li>
+        ))}
+        <li><a href={localePath(locale, "home", "#newsroom")}>{copy.common.nav.latest}</a></li>
+      </ul>
+    </div>
+
+    <div>
+      <h2>{copy.common.footer.newsroom}</h2>
+      <address class="footer-contact">
+        <span>{settings.editorName}</span>
+        <span lang={locale}>{locale === "hi" ? settings.editorTitleHi : settings.editorTitleEn}</span>
+        <a href={`mailto:${settings.email}`}>{settings.email}</a>
+        <a href={`tel:${settings.phoneHref}`}>{settings.phoneDisplay}</a>
+      </address>
+    </div>
+
+    <div>
+      <h2>{copy.common.footer.identities}</h2>
+      <ul class="footer-socials">
+        {socials.filter((social) => social.enabled).map((social) => (
+          <li>
+            <span>{socialPlatformLabels[social.platform]}</span>
+            {social.url ? <a href={social.url} rel="me noopener">{social.identity}</a> : <strong>{social.identity}</strong>}
+          </li>
+        ))}
+      </ul>
+    </div>
+  </div>
+
+  <div class="container policy-note">
+    <strong>{copy.common.footer.policies}</strong>
+    <span>{copy.common.footer.policyNote}</span>
+  </div>
+
+  <div class="container footer-bottom">
+    <span>© 2026 {copy.common.brandName}. {copy.common.footer.rights}</span>
+    <span>{siteConfig.publication.domain}</span>
+  </div>
+</footer>

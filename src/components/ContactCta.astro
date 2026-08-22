@@ -1,0 +1,37 @@
+---
+import { getCopy, localePath } from "../data/i18n";
+import type { EditableSiteSettings, Locale } from "../types/content";
+
+interface Props {
+  locale: Locale;
+  settings: EditableSiteSettings;
+  heading?: string;
+  text?: string;
+}
+
+const {
+  locale,
+  settings,
+  heading,
+  text,
+} = Astro.props;
+const copy = getCopy(locale);
+const resolvedHeading = heading ?? copy.common.contactCta.heading;
+const resolvedText = text ?? copy.common.contactCta.text;
+---
+
+<section class="contact-cta" aria-labelledby="contact-cta-heading">
+  <div class="container contact-cta-inner">
+    <div>
+      <p class="kicker">{copy.common.contactCta.kicker}</p>
+      <h2 id="contact-cta-heading">{resolvedHeading}</h2>
+      <p>{resolvedText}</p>
+    </div>
+    <div class="contact-cta-actions">
+      <a class="button button-light" href={localePath(locale, "contact")}>{copy.common.contactCta.email}</a>
+      <a class="text-link text-link-light" href={`tel:${settings.phoneHref}`}>
+        {settings.phoneDisplay}<span aria-hidden="true">→</span>
+      </a>
+    </div>
+  </div>
+</section>

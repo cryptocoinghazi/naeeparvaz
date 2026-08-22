@@ -1,0 +1,36 @@
+---
+import ContactCta from "../../components/ContactCta.astro";
+import { getCopy, isLocale, localePath } from "../../data/i18n";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { getSiteSettings } from "../../lib/site-repository";
+
+const localeParam = Astro.params.locale;
+if (!isLocale(localeParam)) return new Response("Not found", { status: 404 });
+const locale = localeParam;
+const copy = getCopy(locale);
+const settings = await getSiteSettings(Astro.locals);
+---
+
+<BaseLayout locale={locale} title={copy.seo.aboutTitle} description={copy.seo.aboutDescription} canonicalPath={localePath(locale, "about")}>
+  <section class="page-hero" aria-labelledby="page-title">
+    <div class="container page-hero-inner"><p class="kicker">{copy.about.kicker}</p><h1 id="page-title">{copy.about.title}</h1><p>{copy.about.lead}</p></div>
+  </section>
+  <section class="section">
+    <div class="container article-layout">
+      <aside class="article-index" aria-label={copy.about.indexLabel}>
+        <p>{copy.about.indexLabel}</p>
+        <ol>{copy.about.sections.map((section, index) => <li><a href={`#section-${index + 1}`}>{section.kicker}</a></li>)}</ol>
+      </aside>
+      <article class="longform">
+        {copy.about.sections.map((section, index) => (
+          <section id={`section-${index + 1}`}>
+            <p class="kicker">{section.kicker}</p><h2>{section.title}</h2>
+            {section.paragraphs.map((paragraph) => <p class:list={{ standfirst: index === 0 }}>{paragraph}</p>)}
+            {index === 1 && <blockquote>{copy.about.quote}</blockquote>}
+          </section>
+        ))}
+      </article>
+    </div>
+  </section>
+  <ContactCta locale={locale} settings={settings} heading={copy.about.cta} />
+</BaseLayout>

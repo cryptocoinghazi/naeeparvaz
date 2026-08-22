@@ -1,0 +1,15 @@
+---
+import type { ArticleSummary } from "../types/content";
+
+interface Props {
+  article: ArticleSummary;
+}
+
+const { article } = Astro.props;
+---
+
+<article class="featured-story">
+  <p class="article-category">{article.category}</p>
+  <h3><a href={article.href}>{article.title}</a></h3>
+  <p>{article.summary}</p>
+</article>

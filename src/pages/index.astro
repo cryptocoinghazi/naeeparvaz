@@ -1,0 +1,3 @@
+---
+return Astro.redirect(Astro.cookies.get("np_locale")?.value === "hi" ? "/hi/" : "/en/", 302);
+---

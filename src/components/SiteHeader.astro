@@ -1,0 +1,181 @@
+---
+import { Image } from "astro:assets";
+import primaryBanner from "../assets/naee-parvaz-primary-banner.png";
+import { getCopy, localePath, switchLocalePath } from "../data/i18n";
+import { siteConfig } from "../data/site";
+import type { EditableSiteSettings, Locale } from "../types/content";
+
+interface Props {
+  currentPath: string;
+  locale: Locale;
+  settings: EditableSiteSettings;
+}
+
+const { currentPath, locale, settings } = Astro.props;
+const copy = getCopy(locale);
+const otherLocale: Locale = locale === "en" ? "hi" : "en";
+const languageHref = switchLocalePath(currentPath, otherLocale);
+const navigation = [
+  { label: copy.common.nav.home, href: localePath(locale, "home") },
+  { label: copy.common.nav.latest, href: localePath(locale, "home", "#newsroom") },
+  { label: copy.common.nav.videos, href: localePath(locale, "videos") },
+  { label: copy.common.nav.about, href: localePath(locale, "about") },
+  { label: copy.common.nav.vision, href: localePath(locale, "vision") },
+  { label: copy.common.nav.contact, href: localePath(locale, "contact") },
+];
+const isActive = (href: string) => {
+  if (href.includes("#")) return false;
+  if (href === `/${locale}/`) return currentPath === `/${locale}/`;
+  return currentPath.startsWith(href);
+};
+---
+
+<header class="site-header" data-site-header>
+  <div class="utility-bar">
+    <div class="container utility-inner">
+      <div class="edition-line">
+        <time data-current-date data-locale={locale}>{copy.common.edition}</time>
+        <span aria-hidden="true">•</span>
+        <span lang="hi">{siteConfig.publication.motto}</span>
+      </div>
+      <div class="utility-contact">
+        <a href={`mailto:${settings.email}`}>{settings.email}</a>
+        <a href={`tel:${settings.phoneHref}`}>{settings.phoneDisplay}</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="masthead">
+    <div class="masthead-inner">
+      <a class="brand-banner-link" href={localePath(locale, "home")} aria-label={`${copy.common.brandName} ${copy.common.nav.home}`}>
+        <Image
+          src={primaryBanner}
+          widths={[640, 960, 1280, 1440]}
+          sizes="100vw"
+          format="webp"
+          quality={86}
+          alt={`${copy.common.brandName} — news, digital media, web portal and podcast`}
+          decoding="async"
+          fetchpriority="high"
+          loading="eager"
+        />
+      </a>
+    </div>
+  </div>
+
+  <nav class="primary-nav" aria-label={copy.common.primaryNavigation}>
+    <div class="container nav-inner">
+      <button
+        class="menu-toggle"
+        type="button"
+        aria-expanded="false"
+        aria-controls="primary-navigation"
+        aria-label={`${copy.common.menu}: ${copy.common.primaryNavigation}`}
+        data-open-label={copy.common.menu}
+        data-close-label={copy.common.close}
+        data-navigation-label={copy.common.primaryNavigation}
+        data-menu-toggle
+      >
+        <span class="menu-toggle-lines" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span data-menu-label>{copy.common.menu}</span>
+      </button>
+
+      <div class="nav-links" id="primary-navigation" data-nav-links>
+        {
+          navigation.map((item) => (
+            <a
+              href={item.href}
+              aria-current={isActive(item.href) ? "page" : undefined}
+            >
+              {item.label}
+            </a>
+          ))
+        }
+      </div>
+
+      <a class="language-switcher" href={languageHref} hreflang={otherLocale} lang={otherLocale}>
+        {copy.common.language}
+      </a>
+
+      <a class="nav-contact" href={localePath(locale, "contact")}>
+        <span>{copy.common.editorialContact}</span>
+        <span aria-hidden="true">→</span>
+      </a>
+    </div>
+  </nav>
+  <div class="tricolour-rule" aria-hidden="true"><span></span><span></span><span></span></div>
+</header>
+
+<script>
+  const header = document.querySelector<HTMLElement>("[data-site-header]");
+  const toggle = header?.querySelector<HTMLButtonElement>("[data-menu-toggle]");
+  const links = header?.querySelector<HTMLElement>("[data-nav-links]");
+  const label = toggle?.querySelector<HTMLElement>("[data-menu-label]");
+  const desktopQuery = window.matchMedia("(min-width: 901px)");
+  const openLabel = toggle?.dataset.openLabel ?? "Menu";
+  const closeLabel = toggle?.dataset.closeLabel ?? "Close";
+  const navigationLabel = toggle?.dataset.navigationLabel ?? "Primary navigation";
+
+  const setMenuState = (open: boolean, restoreFocus = false) => {
+    if (!toggle || !links) return;
+    links.classList.toggle("is-open", open);
+    toggle.setAttribute("aria-expanded", String(open));
+    toggle.setAttribute("aria-label", `${open ? closeLabel : openLabel}: ${navigationLabel}`);
+    if (label) label.textContent = open ? closeLabel : openLabel;
+
+    if (open) {
+      links.querySelector<HTMLAnchorElement>("a")?.focus();
+    } else if (restoreFocus) {
+      toggle.focus();
+    }
+  };
+
+  toggle?.addEventListener("click", () => {
+    const open = toggle.getAttribute("aria-expanded") !== "true";
+    setMenuState(open, !open);
+  });
+
+  links?.querySelectorAll("a").forEach((link) => {
+    link.addEventListener("click", () => setMenuState(false));
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && toggle?.getAttribute("aria-expanded") === "true") {
+      setMenuState(false, true);
+    }
+  });
+
+  document.addEventListener("click", (event) => {
+    if (
+      header &&
+      event.target instanceof Node &&
+      !header.contains(event.target) &&
+      toggle?.getAttribute("aria-expanded") === "true"
+    ) {
+      setMenuState(false);
+    }
+  });
+
+  desktopQuery.addEventListener("change", ({ matches }) => {
+    if (matches) setMenuState(false);
+  });
+
+  const dateElement = document.querySelector<HTMLTimeElement>("[data-current-date]");
+  if (dateElement) {
+    const now = new Date();
+    const locale = dateElement.dataset.locale === "hi" ? "hi-IN" : "en-IN";
+    dateElement.dateTime = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Kolkata",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(now);
+    dateElement.textContent = new Intl.DateTimeFormat(locale, {
+      timeZone: "Asia/Kolkata",
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    }).format(now);
+  }
+</script>

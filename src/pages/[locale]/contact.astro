@@ -1,0 +1,83 @@
+---
+import { getCopy, isLocale, localePath } from "../../data/i18n";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { getRuntimeEnv } from "../../lib/runtime";
+import { getSiteSettings, getSocialLinks, socialPlatformLabels } from "../../lib/site-repository";
+
+const localeParam = Astro.params.locale;
+if (!isLocale(localeParam)) return new Response("Not found", { status: 404 });
+const locale = localeParam;
+const copy = getCopy(locale);
+const settings = await getSiteSettings(Astro.locals);
+const socials = await getSocialLinks(Astro.locals);
+const turnstileSiteKey = getRuntimeEnv(Astro.locals).TURNSTILE_SITE_KEY;
+const state = Astro.url.searchParams.get("status");
+---
+
+<BaseLayout locale={locale} title={copy.seo.contactTitle} description={copy.seo.contactDescription} canonicalPath={localePath(locale, "contact")}>
+  <section class="page-hero" aria-labelledby="page-title">
+    <div class="container page-hero-inner"><p class="kicker">{copy.contact.kicker}</p><h1 id="page-title">{copy.contact.title}</h1><p>{copy.contact.lead}</p></div>
+  </section>
+
+  <section class="section" aria-labelledby="editor-contact-heading">
+    <div class="container contact-layout">
+      <aside class="editor-contact-card">
+        <div class="editor-contact-heading"><p>{copy.contact.editor}</p><h2 id="editor-contact-heading">{settings.editorName}</h2><span lang={locale}>{locale === "hi" ? settings.editorTitleHi : settings.editorTitleEn}</span></div>
+        <dl>
+          <div><dt>{copy.contact.labels.email}</dt><dd><a href={`mailto:${settings.email}`}>{settings.email}</a></dd></div>
+          <div><dt>{copy.contact.labels.phone}</dt><dd><a href={`tel:${settings.phoneHref}`}>{settings.phoneDisplay}</a></dd></div>
+          <div><dt>{copy.contact.labels.website}</dt><dd>naeeparvaz.com</dd></div>
+        </dl>
+      </aside>
+
+      <div class="contact-content">
+        <p class="kicker">{copy.contact.formKicker}</p>
+        <h2>{copy.contact.formTitle}</h2>
+        <p class="contact-introduction">{copy.contact.formIntro}</p>
+        {state === "sent" && <p class="form-status form-status-success" role="status">{copy.contact.sent}</p>}
+        {state === "error" && <p class="form-status form-status-error" role="alert">{copy.contact.failed}</p>}
+
+        <form class="contact-form" method="post" action="/api/contact/">
+          <input type="hidden" name="locale" value={locale} />
+          <div class="form-field form-honeypot" aria-hidden="true">
+            <label for="website">Website</label><input id="website" name="website" type="text" tabindex="-1" autocomplete="off" />
+          </div>
+          <div class="form-grid">
+            <div class="form-field"><label for="name">{copy.contact.fields.name}</label><input id="name" name="name" required minlength="2" maxlength="100" autocomplete="name" /></div>
+            <div class="form-field"><label for="email">{copy.contact.fields.email}</label><input id="email" name="email" required type="email" maxlength="254" autocomplete="email" /></div>
+            <div class="form-field"><label for="phone">{copy.contact.fields.phone}</label><input id="phone" name="phone" type="tel" maxlength="30" autocomplete="tel" /></div>
+            <div class="form-field">
+              <label for="category">{copy.contact.fields.category}</label>
+              <select id="category" name="category" required><option value="">—</option>{copy.contact.categories.map(([value, label]) => <option value={value}>{label}</option>)}</select>
+            </div>
+          </div>
+          <div class="form-field"><label for="subject">{copy.contact.fields.subject}</label><input id="subject" name="subject" maxlength="160" /></div>
+          <div class="form-field"><label for="message">{copy.contact.fields.message}</label><textarea id="message" name="message" required minlength="20" maxlength="5000" rows="8"></textarea></div>
+          {turnstileSiteKey ? (
+            <div class="cf-turnstile" data-sitekey={turnstileSiteKey} data-action="contact"></div>
+          ) : (
+            <p class="form-configuration-note">{copy.contact.developmentNote}</p>
+          )}
+          <p class="form-privacy">{copy.contact.privacy}</p>
+          <button class="button" type="submit">{copy.contact.fields.submit}</button>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section-tint" aria-labelledby="social-heading">
+    <div class="container social-layout">
+      <div><p class="kicker">{copy.common.footer.identities}</p><h2 id="social-heading">{copy.contact.socialTitle}</h2></div>
+      <dl class="social-directory">
+        {socials.filter((social) => social.enabled).map((social) => (
+          <div><dt>{socialPlatformLabels[social.platform]}</dt><dd>{social.url ? <a href={social.url} rel="me noopener">{social.identity}</a> : social.identity}</dd></div>
+        ))}
+      </dl>
+    </div>
+  </section>
+
+  <section class="direct-contact" aria-label={copy.common.editorialContact}>
+    <div class="container direct-contact-inner"><p>{copy.contact.directPrompt}</p><a href={`mailto:${settings.email}`}>{settings.email}</a></div>
+  </section>
+  {turnstileSiteKey && <script is:inline src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>}
+</BaseLayout>

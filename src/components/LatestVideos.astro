@@ -1,0 +1,41 @@
+---
+import { getCopy, localePath } from "../data/i18n";
+import type { Locale, ResolvedVideo } from "../types/content";
+import SectionHeader from "./SectionHeader.astro";
+import VideoCard from "./VideoCard.astro";
+
+interface Props {
+  locale: Locale;
+  videos: ResolvedVideo[];
+  full?: boolean;
+}
+const { locale, videos, full = false } = Astro.props;
+const copy = getCopy(locale);
+const visible = full ? videos : videos.slice(0, 5);
+---
+
+<section class="section video-desk" aria-labelledby={full ? "videos-heading" : "latest-videos-heading"}>
+  <div class="container">
+    {!full && (
+      <div id="latest-videos-heading">
+        <SectionHeader
+          kicker={copy.home.videosKicker}
+          title={copy.home.videosTitle}
+          introduction={copy.home.videosIntro}
+        />
+      </div>
+    )}
+    {visible.length ? (
+      <div class="video-grid">
+        {visible.map((video, index) => <VideoCard video={video} locale={locale} featured={index === 0} />)}
+      </div>
+    ) : (
+      <div class="video-empty">
+        <p class="kicker">{copy.common.launchingSoon}</p>
+        <h2>{copy.videos.emptyTitle}</h2>
+        <p>{copy.videos.emptyText}</p>
+      </div>
+    )}
+    {!full && <a class="button button-outline section-action" href={localePath(locale, "videos")}>{copy.home.videosLink}</a>}
+  </div>
+</section>
