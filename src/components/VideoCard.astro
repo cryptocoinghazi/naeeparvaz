@@ -2,6 +2,7 @@
 import { getCopy } from "../data/i18n";
 import { providerLabels, videoEmbedUrl, videoThumbnail } from "../lib/video";
 import type { Locale, ResolvedVideo } from "../types/content";
+import ContentLabels from "./ContentLabels.astro";
 
 interface Props {
   video: ResolvedVideo;
@@ -44,8 +45,9 @@ const date = new Intl.DateTimeFormat(locale === "hi" ? "hi-IN" : "en-IN", {
       <time datetime={video.publishedAt}>{date}</time>
       {featured && <strong>{copy.common.featured}</strong>}
     </div>
-    <h3>{video.title}</h3>
-    {video.description && <p>{video.description}</p>}
+    <ContentLabels labels={video.labels} locale={locale} basePath={`/${locale}/videos/`} />
+    <h3 lang={video.translationLocale}>{video.title}</h3>
+    {video.description && <p lang={video.translationLocale}>{video.description}</p>}
     <a href={video.canonicalUrl} target="_blank" rel="noopener">
       {copy.common.watchExternal} {provider}<span class="visually-hidden"> ({copy.common.newWindow})</span>
     </a>

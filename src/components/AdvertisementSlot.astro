@@ -1,0 +1,30 @@
+---
+import { getPublishingCopy } from "../data/publishing-copy";
+import { getActiveAdvertisement } from "../lib/ad-repository";
+import { driveImagePath } from "../lib/drive-image";
+import type { AdPlacement, Locale } from "../types/content";
+
+interface Props { locale: Locale; placement: AdPlacement }
+const { locale, placement } = Astro.props;
+const ad = await getActiveAdvertisement(Astro.locals, placement, locale);
+const copy = getPublishingCopy(locale);
+const creative = ad?.creativeDriveId ? driveImagePath(ad.creativeDriveId) : undefined;
+---
+
+{ad && (
+  <aside class:list={["advertisement", `advertisement-${placement}`]} aria-label={copy.advertisement}>
+    <div class="advertisement-label">{copy.advertisement}</div>
+    {ad.destinationUrl ? (
+      <a class="advertisement-content" href={ad.destinationUrl} target="_blank" rel="sponsored noopener">
+        {creative && <img src={creative} alt={ad.creativeAlt ?? ad.clientName} width="1200" height="400" loading="lazy" decoding="async" />}
+        {(ad.headline || ad.body) && <span class="advertisement-copy">{ad.headline && <strong>{ad.headline}</strong>}{ad.body && <span>{ad.body}</span>}</span>}
+      </a>
+    ) : (
+      <div class="advertisement-content">
+        {creative && <img src={creative} alt={ad.creativeAlt ?? ad.clientName} width="1200" height="400" loading="lazy" decoding="async" />}
+        {(ad.headline || ad.body) && <span class="advertisement-copy">{ad.headline && <strong>{ad.headline}</strong>}{ad.body && <span>{ad.body}</span>}</span>}
+      </div>
+    )}
+    <p>{copy.adResponsibility}</p>
+  </aside>
+)}

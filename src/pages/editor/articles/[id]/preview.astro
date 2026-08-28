@@ -1,0 +1,22 @@
+---
+import ContentLabels from "../../../../components/ContentLabels.astro";
+import VideoCard from "../../../../components/VideoCard.astro";
+import BaseLayout from "../../../../layouts/BaseLayout.astro";
+import { getAdminArticle, resolveArticle } from "../../../../lib/article-repository";
+import { driveImagePath } from "../../../../lib/drive-image";
+import { renderSafeMarkdown } from "../../../../lib/markdown";
+import { getPublishedVideos } from "../../../../lib/video-repository";
+const id = Astro.params.id ?? "";
+if (!/^[0-9a-f-]{36}$/i.test(id)) return new Response("Not found", { status: 404 });
+const record = await getAdminArticle(Astro.locals, id);
+if (!record) return new Response("Not found", { status: 404 });
+const locale = Astro.url.searchParams.get("locale") === "hi" ? "hi" : "en";
+const resolved = resolveArticle(record, locale);
+const videos = await getPublishedVideos(Astro.locals, locale);
+const related = record.videoIds.flatMap((videoId) => videos.find((video) => video.id === videoId) ?? []);
+const coverPath = record.coverDriveId ? driveImagePath(record.coverDriveId) : undefined;
+---
+<BaseLayout locale={locale} title={`Preview: ${resolved.title}`} description={resolved.summary} canonicalPath={`/${locale}/news/${record.slug}/`}>
+  <div class="admin-preview-banner"><strong>Protected preview — {record.status}</strong><a href={`/editor/articles/${record.id}/`}>Return to editor</a><a href={`/editor/articles/${record.id}/preview/?locale=${locale === "en" ? "hi" : "en"}`}>Preview {locale === "en" ? "Hindi" : "English"}</a></div>
+  <article class="news-article"><header class="news-article-header container"><ContentLabels labels={record.labels} locale={locale} basePath={`/${locale}/news/`} /><h1 lang={resolved.translationLocale}>{resolved.title}</h1><p class="news-article-summary" lang={resolved.translationLocale}>{resolved.summary}</p><div class="news-article-meta"><span><strong>{record.byline}</strong></span><time datetime={record.publishedAt}>{record.publishedAt.slice(0, 10)}</time></div>{coverPath && <img class="news-article-cover" src={coverPath} alt={resolved.coverAlt ?? resolved.title} width="1200" height="675" />}</header><div class="container news-article-layout"><div class="news-article-body" lang={resolved.translationLocale} set:html={renderSafeMarkdown(resolved.bodyMarkdown)}></div></div>{related.length > 0 && <section class="section related-videos"><div class="container"><h2>Related videos</h2><div class="video-grid">{related.map((video) => <VideoCard video={video} locale={locale} />)}</div></div></section>}</article>
+</BaseLayout>

@@ -1,19 +1,26 @@
 ---
-import type { ArticleSummary } from "../types/content";
+import { getPublishingCopy } from "../data/publishing-copy";
+import { driveImagePath } from "../lib/drive-image";
+import type { Locale, ResolvedArticle } from "../types/content";
+import ContentLabels from "./ContentLabels.astro";
 
 interface Props {
-  article: ArticleSummary;
+  article: ResolvedArticle;
+  locale: Locale;
 }
 
-const { article } = Astro.props;
+const { article, locale } = Astro.props;
+const copy = getPublishingCopy(locale);
+const href = `/${locale}/news/${article.slug}/`;
+const date = new Intl.DateTimeFormat(locale === "hi" ? "hi-IN" : "en-IN", { dateStyle: "medium", timeZone: "Asia/Kolkata" }).format(new Date(article.publishedAt));
 ---
 
 <article class="article-card">
-  {article.image && (
-    <img src={article.image.src} alt={article.image.alt} loading="lazy" decoding="async" />
+  {article.coverDriveId && (
+    <a class="article-card-image" href={href} tabindex="-1" aria-hidden="true"><img src={driveImagePath(article.coverDriveId)} alt="" width="720" height="405" loading="lazy" decoding="async" /></a>
   )}
-  <p class="article-category">{article.category}</p>
-  <h3><a href={article.href}>{article.title}</a></h3>
-  <p>{article.summary}</p>
-  {article.publishedAt && <time datetime={article.publishedAt}>{article.publishedAt}</time>}
+  <ContentLabels labels={article.labels} locale={locale} basePath={`/${locale}/news/`} />
+  <h3 lang={article.translationLocale}><a href={href}>{article.title}</a></h3>
+  <p lang={article.translationLocale}>{article.summary}</p>
+  <div class="article-card-footer"><time datetime={article.publishedAt}>{date}</time><a href={href}>{copy.news.read} <span aria-hidden="true">→</span></a></div>
 </article>

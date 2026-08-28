@@ -1,0 +1,15 @@
+---
+import AdminHeader from "../../../components/AdminHeader.astro";
+import AdvertisementEditorForm from "../../../components/AdvertisementEditorForm.astro";
+import { getAdminAdvertisements } from "../../../lib/ad-repository";
+import "../../../styles/global.css";
+import "../../../styles/admin.css";
+const advertisements = await getAdminAdvertisements(Astro.locals);
+const saved = Astro.url.searchParams.get("saved");
+const error = Astro.url.searchParams.get("error");
+---
+<!doctype html>
+<html lang="en">
+  <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><meta name="robots" content="noindex, nofollow" /><meta name="theme-color" content="#082f78" /><title>Advertisements | Naee Parvaz editor</title></head>
+  <body class="admin-body"><a class="skip-link" href="#admin-content">Skip to advertisement desk</a><AdminHeader kicker="Commercial desk" title="Direct-client advertisements" description="Create labeled, scheduled placements without accepting third-party scripts or tracking pixels." /><main id="admin-content" class="admin-container admin-main">{saved && <p class="admin-notice admin-notice-success" role="status">Advertisement changes saved.</p>}{error && <p class="admin-notice admin-notice-error" role="alert">The advertisement was not saved. Check its schedule, creative, link and public Drive access.</p>}<section class="admin-section"><div class="admin-section-heading"><div><p class="kicker">New campaign</p><h2>Create an advertisement</h2></div><p>Nothing appears publicly until its status is Published and its schedule is active.</p></div><AdvertisementEditorForm /></section><section class="admin-section"><div class="admin-section-heading"><div><p class="kicker">Campaign library</p><h2>Manage advertisements</h2></div><p>{advertisements.length} {advertisements.length === 1 ? "campaign" : "campaigns"}. Expired placements stop appearing automatically.</p></div>{advertisements.length ? <div class="admin-record-list">{advertisements.map((advertisement) => <details class="admin-ad-record"><summary><span><span class:list={["admin-status", `admin-status-${advertisement.status}`]}>{advertisement.status}</span><strong>{advertisement.clientName}</strong><small>{advertisement.placement} · priority {advertisement.priority}</small></span><span>Edit campaign</span></summary><div class="admin-ad-record-body"><AdvertisementEditorForm advertisement={advertisement} /><form method="post" action="/api/editor/ad-status/"><input type="hidden" name="id" value={advertisement.id} /><input type="hidden" name="status" value={advertisement.status === "published" ? "draft" : "published"} /><button class="button button-outline" type="submit">{advertisement.status === "published" ? "Unpublish" : "Publish"}</button></form></div></details>)}</div> : <p class="admin-empty">No advertisements yet. Create the first campaign above.</p>}</section></main></body>
+</html>

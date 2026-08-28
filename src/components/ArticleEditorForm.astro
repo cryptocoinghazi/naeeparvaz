@@ -1,0 +1,86 @@
+---
+import type { ArticleRecord, ContentLabel, ResolvedVideo } from "../types/content";
+import AdminLabelFields from "./AdminLabelFields.astro";
+
+interface Props {
+  article?: ArticleRecord;
+  labels: ContentLabel[];
+  videos: ResolvedVideo[];
+}
+const { article, labels, videos } = Astro.props;
+const selectedLabels = article?.labels.map((label) => label.id) ?? ["other"];
+const dateValue = article?.publishedAt.slice(0, 10) ?? new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+---
+
+<form class="admin-form" method="post" action="/api/editor/articles/">
+  {article && <input type="hidden" name="id" value={article.id} />}
+  <div class="admin-form-grid">
+    <label>Stable URL slug<input name="slug" required={!article} readonly={Boolean(article)} minlength="3" maxlength="120" pattern="[a-z0-9]+(?:-[a-z0-9]+)*" value={article?.slug ?? ""} placeholder="city-council-public-meeting" /></label>
+    <label>Byline<input name="byline" required minlength="2" maxlength="120" value={article?.byline ?? "Naee Parvaz News Desk"} /></label>
+    <label>Publication date<input name="publishedAt" required type="date" value={dateValue} /></label>
+    <label>Status<select name="status"><option value="draft" selected={article?.status !== "published"}>Draft</option><option value="published" selected={article?.status === "published"}>Published</option></select></label>
+    <label>Source type<select name="sourceType"><option value="original" selected={article?.sourceType !== "external"}>Original reporting</option><option value="external" selected={article?.sourceType === "external"}>External source</option></select></label>
+    <label class="admin-check admin-check-bottom"><input name="featured" type="checkbox" checked={article?.featured} /> Feature on the homepage</label>
+    <label>Source/publisher name<input name="sourceName" maxlength="160" value={article?.sourceName ?? ""} /></label>
+    <label>Exact source URL<input name="sourceUrl" type="url" inputmode="url" maxlength="1000" value={article?.sourceUrl ?? ""} placeholder="https://…" /></label>
+    <label class="admin-span-2">Google Drive cover image (optional)<input name="coverUrl" type="url" inputmode="url" maxlength="1000" value={article?.coverSourceUrl ?? ""} placeholder="https://drive.google.com/file/d/…/view" /></label>
+    <AdminLabelFields labels={labels} selected={selectedLabels} />
+
+    <fieldset class="admin-translation admin-span-2">
+      <legend>English article</legend>
+      <div class="admin-form-grid">
+        <label class="admin-span-2">Headline<input name="titleEn" maxlength="240" value={article?.translations.en?.title ?? ""} /></label>
+        <label class="admin-span-2">Summary<textarea name="summaryEn" maxlength="600" rows="3">{article?.translations.en?.summary ?? ""}</textarea></label>
+        <label class="admin-span-2">Article body (safe Markdown)<textarea name="bodyEn" maxlength="50000" rows="16">{article?.translations.en?.bodyMarkdown ?? ""}</textarea></label>
+        <label class="admin-span-2">Cover image alternative text<input name="coverAltEn" maxlength="240" value={article?.translations.en?.coverAlt ?? ""} /></label>
+      </div>
+    </fieldset>
+
+    <fieldset class="admin-translation admin-span-2" lang="hi">
+      <legend>हिंदी लेख</legend>
+      <div class="admin-form-grid">
+        <label class="admin-span-2">शीर्षक<input name="titleHi" maxlength="240" value={article?.translations.hi?.title ?? ""} lang="hi" /></label>
+        <label class="admin-span-2">सारांश<textarea name="summaryHi" maxlength="600" rows="3" lang="hi">{article?.translations.hi?.summary ?? ""}</textarea></label>
+        <label class="admin-span-2">लेख (सुरक्षित Markdown)<textarea name="bodyHi" maxlength="50000" rows="16" lang="hi">{article?.translations.hi?.bodyMarkdown ?? ""}</textarea></label>
+        <label class="admin-span-2">कवर चित्र का वैकल्पिक पाठ<input name="coverAltHi" maxlength="240" value={article?.translations.hi?.coverAlt ?? ""} lang="hi" /></label>
+      </div>
+    </fieldset>
+
+    <fieldset class="admin-related-videos admin-span-2">
+      <legend>Related videos <small>(up to three published videos)</small></legend>
+      <label class="admin-video-search">Search videos<input type="search" placeholder="Search titles or platform" data-video-search /></label>
+      <div class="admin-video-choices" data-video-choices>
+        {videos.map((video) => (
+          <label data-video-choice data-search={`${video.title} ${video.provider}`.toLowerCase()}>
+            <input name="videoIds" type="checkbox" value={video.id} checked={article?.videoIds.includes(video.id)} disabled={video.status !== "published" && !article?.videoIds.includes(video.id)} />
+            <span><strong>{video.title}</strong><small>{video.provider} · {video.status} · {video.publishedAt.slice(0, 10)}</small></span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  </div>
+  <p class="admin-help">Complete at least one language. If the other translation is empty, readers see the available version. Markdown HTML is escaped.</p>
+  <div class="admin-actions">
+    <button class="button" type="submit">{article ? "Save article" : "Create article"}</button>
+    {article && <a class="button button-outline" href={`/editor/articles/${article.id}/preview/`} target="_blank" rel="noopener">Preview</a>}
+    <a class="button button-outline" href="/editor/articles/">Cancel</a>
+  </div>
+</form>
+
+<script>
+  const search = document.querySelector<HTMLInputElement>("[data-video-search]");
+  const choices = [...document.querySelectorAll<HTMLElement>("[data-video-choice]")];
+  search?.addEventListener("input", () => {
+    const query = search.value.trim().toLowerCase();
+    choices.forEach((choice) => { choice.hidden = Boolean(query) && !choice.dataset.search?.includes(query); });
+  });
+  document.querySelector("[data-video-choices]")?.addEventListener("change", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement) || !target.checked) return;
+    const checked = document.querySelectorAll<HTMLInputElement>('input[name="videoIds"]:checked');
+    if (checked.length > 3) {
+      target.checked = false;
+      window.alert("Choose no more than three related videos.");
+    }
+  });
+</script>

@@ -1,4 +1,5 @@
 import type { Locale, ResolvedVideo, VideoProvider, VideoRecord } from "../types/content";
+import { driveImagePath } from "./drive-image";
 
 export interface ParsedVideoUrl {
   sourceUrl: string;
@@ -97,7 +98,8 @@ export function videoEmbedUrl(video: Pick<VideoRecord, "provider" | "providerId"
   return `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(video.canonicalUrl)}&show_text=false&width=720`;
 }
 
-export function videoThumbnail(video: Pick<VideoRecord, "provider" | "providerId">): string | undefined {
+export function videoThumbnail(video: Pick<VideoRecord, "provider" | "providerId" | "thumbnailDriveId">): string | undefined {
+  if (video.thumbnailDriveId) return driveImagePath(video.thumbnailDriveId);
   return video.provider === "youtube" ? `https://i.ytimg.com/vi/${video.providerId}/hqdefault.jpg` : undefined;
 }
 

@@ -1,4 +1,4 @@
-import type { Locale, ResolvedVideo, VideoRecord, VideoStatus, VideoTranslation } from "../types/content";
+import type { ContentLabel, Locale, ResolvedVideo, VideoRecord, VideoStatus, VideoTranslation } from "../types/content";
 import { getDatabase, timestamp, withTransaction } from "./database";
 import { resolveVideo } from "./video";
 
@@ -10,6 +10,8 @@ interface VideoJoinRow {
   provider_id: string;
   published_at: Date | string;
   category: string;
+  thumbnail_drive_id: string | null;
+  thumbnail_source_url: string | null;
   featured: boolean;
   status: VideoStatus;
   created_at: Date | string;
@@ -17,6 +19,11 @@ interface VideoJoinRow {
   locale: Locale | null;
   title: string | null;
   description: string | null;
+  label_id: string | null;
+  label_kind: ContentLabel["kind"] | null;
+  label_name_en: string | null;
+  label_name_hi: string | null;
+  label_display_order: number | null;
 }
 
 export interface VideoInput {
@@ -26,7 +33,9 @@ export interface VideoInput {
   provider: VideoRecord["provider"];
   providerId: string;
   publishedAt: string;
-  category: string;
+  labelIds: string[];
+  thumbnailDriveId?: string;
+  thumbnailSourceUrl?: string;
   featured: boolean;
   status: VideoStatus;
   translations: Partial<Record<Locale, VideoTranslation>>;
@@ -45,6 +54,9 @@ function groupVideos(rows: VideoJoinRow[]): VideoRecord[] {
         providerId: row.provider_id,
         publishedAt: timestamp(row.published_at),
         category: row.category,
+        labels: [],
+        thumbnailDriveId: row.thumbnail_drive_id ?? undefined,
+        thumbnailSourceUrl: row.thumbnail_source_url ?? undefined,
         featured: row.featured,
         status: row.status,
         translations: {},
@@ -56,8 +68,20 @@ function groupVideos(rows: VideoJoinRow[]): VideoRecord[] {
     if (row.locale && row.title) {
       video.translations[row.locale] = { title: row.title, description: row.description ?? undefined };
     }
+    if (row.label_id && row.label_kind && row.label_name_en && row.label_name_hi && row.label_display_order !== null && !video.labels.some((label) => label.id === row.label_id)) {
+      video.labels.push({
+        id: row.label_id,
+        kind: row.label_kind,
+        nameEn: row.label_name_en,
+        nameHi: row.label_name_hi,
+        displayOrder: row.label_display_order,
+      });
+    }
   }
-  return [...videos.values()];
+  return [...videos.values()].map((video) => ({
+    ...video,
+    labels: video.labels.sort((a, b) => a.displayOrder - b.displayOrder),
+  }));
 }
 
 async function queryVideos(locals: App.Locals, publishedOnly: boolean): Promise<VideoRecord[]> {
@@ -66,9 +90,13 @@ async function queryVideos(locals: App.Locals, publishedOnly: boolean): Promise<
   const where = publishedOnly ? "WHERE v.status = 'published'" : "";
   try {
     const result = await db.query<VideoJoinRow>(`
-      SELECT v.*, t.locale, t.title, t.description
+      SELECT v.*, t.locale, t.title, t.description,
+        cl.id AS label_id, cl.kind AS label_kind, cl.name_en AS label_name_en,
+        cl.name_hi AS label_name_hi, cl.display_order AS label_display_order
       FROM videos v
       LEFT JOIN video_translations t ON t.video_id = v.id
+      LEFT JOIN video_labels vl ON vl.video_id = v.id
+      LEFT JOIN content_labels cl ON cl.id = vl.label_id
       ${where}
       ORDER BY v.featured DESC, v.published_at DESC, v.created_at DESC
     `);
@@ -91,6 +119,12 @@ export async function getAdminVideos(locals: App.Locals): Promise<VideoRecord[]>
   return queryVideos(locals, false);
 }
 
+export async function getAdminResolvedVideos(locals: App.Locals, locale: Locale): Promise<ResolvedVideo[]> {
+  return (await queryVideos(locals, false)).flatMap((video) => {
+    try { return [resolveVideo(video, locale)]; } catch { return []; }
+  });
+}
+
 export async function saveVideo(locals: App.Locals, input: VideoInput): Promise<string> {
   const id = input.id ?? crypto.randomUUID();
   await withTransaction(locals, async (client) => {
@@ -99,8 +133,9 @@ export async function saveVideo(locals: App.Locals, input: VideoInput): Promise<
     }
     await client.query(`
       INSERT INTO videos (
-        id, source_url, canonical_url, provider, provider_id, published_at, category, featured, status, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        id, source_url, canonical_url, provider, provider_id, published_at, category, thumbnail_drive_id,
+        thumbnail_source_url, featured, status, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       ON CONFLICT(id) DO UPDATE SET
         source_url = excluded.source_url,
         canonical_url = excluded.canonical_url,
@@ -108,6 +143,8 @@ export async function saveVideo(locals: App.Locals, input: VideoInput): Promise<
         provider_id = excluded.provider_id,
         published_at = excluded.published_at,
         category = excluded.category,
+        thumbnail_drive_id = excluded.thumbnail_drive_id,
+        thumbnail_source_url = excluded.thumbnail_source_url,
         featured = excluded.featured,
         status = excluded.status,
         updated_at = CURRENT_TIMESTAMP
@@ -118,7 +155,9 @@ export async function saveVideo(locals: App.Locals, input: VideoInput): Promise<
       input.provider,
       input.providerId,
       input.publishedAt,
-      input.category,
+      input.labelIds[0],
+      input.thumbnailDriveId || null,
+      input.thumbnailSourceUrl || null,
       input.featured,
       input.status,
     ]);
@@ -130,6 +169,10 @@ export async function saveVideo(locals: App.Locals, input: VideoInput): Promise<
         "INSERT INTO video_translations (video_id, locale, title, description) VALUES ($1, $2, $3, $4)",
         [id, locale, translation.title, translation.description || null],
       );
+    }
+    await client.query("DELETE FROM video_labels WHERE video_id = $1", [id]);
+    for (const labelId of input.labelIds) {
+      await client.query("INSERT INTO video_labels (video_id, label_id) VALUES ($1, $2)", [id, labelId]);
     }
   });
   return id;

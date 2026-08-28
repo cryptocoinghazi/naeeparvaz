@@ -1,5 +1,6 @@
 ---
-import { videoCategories } from "../../data/site";
+import AdminLabelFields from "../../components/AdminLabelFields.astro";
+import { getContentLabels } from "../../lib/label-repository";
 import { getSiteSettings, getSocialLinks, socialPlatformLabels } from "../../lib/site-repository";
 import { getAdminVideos } from "../../lib/video-repository";
 import { providerLabels } from "../../lib/video";
@@ -9,6 +10,7 @@ import "../../styles/admin.css";
 const settings = await getSiteSettings(Astro.locals);
 const socials = await getSocialLinks(Astro.locals);
 const videos = await getAdminVideos(Astro.locals);
+const labels = await getContentLabels(Astro.locals);
 const saved = Astro.url.searchParams.get("saved");
 const error = Astro.url.searchParams.get("error");
 const today = new Intl.DateTimeFormat("en-CA", {
@@ -39,6 +41,9 @@ const today = new Intl.DateTimeFormat("en-CA", {
         </div>
         <nav aria-label="Admin shortcuts">
           <a class="button button-light" href="/en/" target="_blank" rel="noopener">View website</a>
+          <a class="button button-outline admin-button-outline" href="/editor/articles/">Articles</a>
+          <a class="button button-outline admin-button-outline" href="/editor/ads/">Advertisements</a>
+          <a class="button button-outline admin-button-outline" href="/editor/analytics/">Analytics</a>
           <a class="button button-outline admin-button-outline" href="#new-video">Add video</a>
           <form class="admin-logout-form" method="post" action="/api/auth/logout/">
             <button class="button button-outline admin-button-outline" type="submit">Sign out</button>
@@ -104,8 +109,9 @@ const today = new Intl.DateTimeFormat("en-CA", {
         <form class="admin-form" method="post" action="/api/editor/videos/">
           <div class="admin-form-grid">
             <label class="admin-span-2">Public video URL<input name="sourceUrl" required type="url" inputmode="url" maxlength="1000" placeholder="https://www.youtube.com/watch?v=…" /></label>
-            <label>Category<select name="category" required>{videoCategories.map((category) => <option value={category}>{category}</option>)}</select></label>
             <label>Published date<input name="publishedAt" required type="date" value={today} /></label>
+            <label class="admin-span-2">Google Drive thumbnail (optional)<input name="thumbnailUrl" type="url" inputmode="url" maxlength="1000" placeholder="https://drive.google.com/file/d/…/view" /></label>
+            <AdminLabelFields labels={labels} selected={["other"]} />
             <label>English title<input name="titleEn" maxlength="240" /></label>
             <label lang="hi">हिंदी शीर्षक<input name="titleHi" maxlength="240" lang="hi" /></label>
             <label>English description<textarea name="descriptionEn" maxlength="1200" rows="4"></textarea></label>
@@ -141,8 +147,9 @@ const today = new Intl.DateTimeFormat("en-CA", {
                   <input type="hidden" name="id" value={video.id} />
                   <div class="admin-form-grid">
                     <label class="admin-span-2">Public video URL<input name="sourceUrl" required type="url" maxlength="1000" value={video.sourceUrl} /></label>
-                    <label>Category<select name="category" required>{videoCategories.map((category) => <option value={category} selected={video.category === category}>{category}</option>)}</select></label>
                     <label>Published date<input name="publishedAt" required type="date" value={video.publishedAt.slice(0, 10)} /></label>
+                    <label class="admin-span-2">Google Drive thumbnail (optional)<input name="thumbnailUrl" type="url" inputmode="url" maxlength="1000" value={video.thumbnailSourceUrl ?? ""} /></label>
+                    <AdminLabelFields labels={labels} selected={video.labels.map((label) => label.id)} />
                     <label>English title<input name="titleEn" maxlength="240" value={video.translations.en?.title ?? ""} /></label>
                     <label lang="hi">हिंदी शीर्षक<input name="titleHi" maxlength="240" value={video.translations.hi?.title ?? ""} lang="hi" /></label>
                     <label>English description<textarea name="descriptionEn" maxlength="1200" rows="4">{video.translations.en?.description ?? ""}</textarea></label>

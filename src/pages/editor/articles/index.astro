@@ -1,0 +1,50 @@
+---
+import AdminHeader from "../../../components/AdminHeader.astro";
+import { getAdminArticles } from "../../../lib/article-repository";
+import "../../../styles/global.css";
+import "../../../styles/admin.css";
+
+const articles = await getAdminArticles(Astro.locals);
+const saved = Astro.url.searchParams.get("saved");
+const error = Astro.url.searchParams.get("error");
+---
+
+<!doctype html>
+<html lang="en">
+  <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><meta name="robots" content="noindex, nofollow" /><meta name="theme-color" content="#082f78" /><title>Articles | Naee Parvaz editor</title></head>
+  <body class="admin-body">
+    <a class="skip-link" href="#admin-content">Skip to article desk</a>
+    <AdminHeader kicker="Publishing desk" title="News articles" description="Create, review and publish bilingual reporting without rebuilding the website." />
+    <main id="admin-content" class="admin-container admin-main">
+      {saved && <p class="admin-notice admin-notice-success" role="status">Article status updated.</p>}
+      {error && <p class="admin-notice admin-notice-error" role="alert">The article update failed. Review its fields and try again.</p>}
+      <section class="admin-section">
+        <div class="admin-section-heading">
+          <div><p class="kicker">Article library</p><h2>Manage publication</h2></div>
+          <div class="admin-actions"><a class="button" href="/editor/articles/new/">Create article</a><a class="button button-outline" href="/en/news/" target="_blank" rel="noopener">View public news</a></div>
+        </div>
+        {articles.length ? (
+          <div class="admin-record-list">
+            {articles.map((article) => (
+              <article class="admin-summary-record">
+                <div>
+                  <div class="admin-record-badges"><span class:list={["admin-status", `admin-status-${article.status}`]}>{article.status}</span>{article.featured && <span class="admin-featured">Featured</span>}{!article.translations.en && <span class="admin-translation-warning">English fallback</span>}{!article.translations.hi && <span class="admin-translation-warning">Hindi fallback</span>}</div>
+                  <h3>{article.translations.en?.title ?? article.translations.hi?.title}</h3>
+                  <p>/{article.slug}/ · {article.publishedAt.slice(0, 10)} · {article.byline}</p>
+                </div>
+                <div class="admin-actions">
+                  <a class="button button-outline" href={`/editor/articles/${article.id}/`}>Edit</a>
+                  <a class="button button-outline" href={`/editor/articles/${article.id}/preview/`} target="_blank" rel="noopener">Preview</a>
+                  <form method="post" action="/api/editor/article-status/">
+                    <input type="hidden" name="id" value={article.id} /><input type="hidden" name="status" value={article.status === "published" ? "draft" : "published"} />
+                    <button class="button" type="submit">{article.status === "published" ? "Unpublish" : "Publish"}</button>
+                  </form>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : <p class="admin-empty">No articles yet. Create the first one as a draft and use Preview before publishing.</p>}
+      </section>
+    </main>
+  </body>
+</html>

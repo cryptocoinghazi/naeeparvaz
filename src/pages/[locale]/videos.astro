@@ -1,19 +1,24 @@
 ---
 import VideoLibrary from "../../components/VideoLibrary.astro";
+import SourceNotice from "../../components/SourceNotice.astro";
 import { getCopy, isLocale, localePath } from "../../data/i18n";
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import { getPublishedVideos } from "../../lib/video-repository";
 import { createVideoLibraryView } from "../../lib/video-library";
+import { getContentLabels } from "../../lib/label-repository";
 
 const localeParam = Astro.params.locale;
 if (!isLocale(localeParam)) return new Response("Not found", { status: 404 });
 const locale = localeParam;
 const copy = getCopy(locale);
 const videos = await getPublishedVideos(Astro.locals, locale);
+const labels = await getContentLabels(Astro.locals);
 const library = createVideoLibraryView(
   videos,
   Astro.url.searchParams.get("platform"),
+  Astro.url.searchParams.get("label"),
   Astro.url.searchParams.get("page"),
+  labels,
 );
 ---
 
@@ -21,5 +26,6 @@ const library = createVideoLibraryView(
   <section class="page-hero" aria-labelledby="videos-heading">
     <div class="container page-hero-inner"><p class="kicker">{copy.videos.kicker}</p><h1 id="videos-heading">{copy.videos.title}</h1><p>{copy.videos.lead}</p></div>
   </section>
-  <VideoLibrary locale={locale} library={library} />
+  <VideoLibrary locale={locale} library={library} labels={labels} />
+  <div class="container source-notice-wrap"><SourceNotice locale={locale} /></div>
 </BaseLayout>

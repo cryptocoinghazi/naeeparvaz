@@ -1,22 +1,26 @@
 ---
 import { getCopy, localePath } from "../data/i18n";
 import { providerLabels } from "../lib/video";
+import { labelName } from "../lib/label-repository";
 import { videoLibraryProviders, type VideoLibraryView } from "../lib/video-library";
-import type { Locale, VideoProvider } from "../types/content";
+import type { ContentLabel, Locale, VideoProvider } from "../types/content";
+import AdvertisementSlot from "./AdvertisementSlot.astro";
 import VideoCard from "./VideoCard.astro";
 
 interface Props {
   locale: Locale;
   library: VideoLibraryView;
+  labels: ContentLabel[];
 }
 
-const { locale, library } = Astro.props;
+const { locale, library, labels } = Astro.props;
 const copy = getCopy(locale);
 const basePath = localePath(locale, "videos");
 
-function libraryUrl(provider: VideoProvider | undefined, page = 1): string {
+function libraryUrl(provider: VideoProvider | undefined, labelId: string | undefined, page = 1): string {
   const params = new URLSearchParams();
   if (provider) params.set("platform", provider);
+  if (labelId) params.set("label", labelId);
   if (page > 1) params.set("page", String(page));
   const query = params.toString();
   return query ? `${basePath}?${query}` : basePath;
@@ -30,6 +34,8 @@ const filterOptions: Array<{ provider?: VideoProvider; label: string; count: num
     count: library.counts[provider],
   })),
 ];
+const firstRow = library.videos.slice(0, 3);
+const remaining = library.videos.slice(3);
 
 const numberedPages: Array<number | "ellipsis"> = [];
 let previousVisiblePage = 0;
@@ -61,7 +67,7 @@ for (let page = 1; page <= library.totalPages; page += 1) {
         return (
           <a
             class:list={["video-filter", { "is-active": active }]}
-            href={libraryUrl(filter.provider)}
+            href={libraryUrl(filter.provider, library.activeLabel?.id)}
             aria-current={active ? "page" : undefined}
           >
             <span>{filter.label}</span>
@@ -71,10 +77,21 @@ for (let page = 1; page <= library.totalPages; page += 1) {
       })}
     </nav>
 
+    <nav class="content-filters" aria-label={copy.videos.categoryFilterLabel}>
+      <a class:list={["content-filter", { "is-active": !library.activeLabel }]} href={libraryUrl(library.activeProvider, undefined)} aria-current={!library.activeLabel ? "page" : undefined}>{copy.videos.allCategories}</a>
+      {labels.map((label) => (
+        <a class:list={["content-filter", { "is-active": library.activeLabel?.id === label.id }]} href={libraryUrl(library.activeProvider, label.id)} aria-current={library.activeLabel?.id === label.id ? "page" : undefined}>
+          <span>{labelName(label, locale)}</span><strong>{library.labelCounts[label.id] ?? 0}</strong>
+        </a>
+      ))}
+    </nav>
+
     {library.videos.length ? (
-      <div class="video-library-grid">
-        {library.videos.map((video) => <VideoCard video={video} locale={locale} />)}
-      </div>
+      <>
+        <div class="video-library-grid">{firstRow.map((video) => <VideoCard video={video} locale={locale} />)}</div>
+        <AdvertisementSlot locale={locale} placement="video-listing" />
+        {remaining.length > 0 && <div class="video-library-grid video-library-grid-continuation">{remaining.map((video) => <VideoCard video={video} locale={locale} />)}</div>}
+      </>
     ) : (
       <div class="video-empty video-library-empty">
         <p class="kicker">{copy.videos.allPlatforms}</p>
@@ -86,7 +103,7 @@ for (let page = 1; page <= library.totalPages; page += 1) {
     {library.totalPages > 1 && (
       <nav class="video-pagination" aria-label={copy.videos.paginationLabel}>
         {library.currentPage > 1 ? (
-          <a class="video-page-direction" href={libraryUrl(library.activeProvider, library.currentPage - 1)} rel="prev">
+          <a class="video-page-direction" href={libraryUrl(library.activeProvider, library.activeLabel?.id, library.currentPage - 1)} rel="prev">
             <span aria-hidden="true">←</span> {copy.videos.previousPage}
           </a>
         ) : (
@@ -97,7 +114,7 @@ for (let page = 1; page <= library.totalPages; page += 1) {
             <span class="video-page-ellipsis" aria-hidden="true">…</span>
           ) : (
             <a
-              href={libraryUrl(library.activeProvider, page)}
+              href={libraryUrl(library.activeProvider, library.activeLabel?.id, page)}
               class:list={["video-page-number", { "is-active": page === library.currentPage }]}
               aria-current={page === library.currentPage ? "page" : undefined}
               aria-label={`${copy.videos.pageLabel} ${page}`}
@@ -105,7 +122,7 @@ for (let page = 1; page <= library.totalPages; page += 1) {
           ))}
         </div>
         {library.currentPage < library.totalPages ? (
-          <a class="video-page-direction" href={libraryUrl(library.activeProvider, library.currentPage + 1)} rel="next">
+          <a class="video-page-direction" href={libraryUrl(library.activeProvider, library.activeLabel?.id, library.currentPage + 1)} rel="next">
             {copy.videos.nextPage} <span aria-hidden="true">→</span>
           </a>
         ) : (

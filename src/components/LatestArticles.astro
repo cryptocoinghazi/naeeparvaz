@@ -1,0 +1,18 @@
+---
+import { getPublishingCopy } from "../data/publishing-copy";
+import type { Locale, ResolvedArticle } from "../types/content";
+import ArticleCard from "./ArticleCard.astro";
+import SectionHeader from "./SectionHeader.astro";
+
+interface Props { locale: Locale; articles: ResolvedArticle[] }
+const { locale, articles } = Astro.props;
+const copy = getPublishingCopy(locale);
+---
+
+<section class="section newsroom-section" id="newsroom" aria-labelledby="latest-news-heading">
+  <div class="container">
+    <div id="latest-news-heading"><SectionHeader kicker={copy.news.latestKicker} title={copy.news.latestTitle} introduction={copy.news.latestIntro} /></div>
+    <div class="article-card-grid">{articles.slice(0, 6).map((article) => <ArticleCard article={article} locale={locale} />)}</div>
+    <a class="button button-outline section-action" href={`/${locale}/news/`}>{copy.news.viewAll}</a>
+  </div>
+</section>

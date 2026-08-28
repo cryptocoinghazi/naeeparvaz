@@ -2,6 +2,7 @@
 import { getCopy, localePath } from "../data/i18n";
 import { siteConfig } from "../data/site";
 import { socialPlatformLabels } from "../lib/site-repository";
+import { getAllTimeVisitCount } from "../lib/analytics-repository";
 import type { EditableSiteSettings, EditableSocialLink, Locale } from "../types/content";
 
 interface Props {
@@ -12,8 +13,10 @@ interface Props {
 
 const { locale, settings, socials } = Astro.props;
 const copy = getCopy(locale);
+const visitCount = await getAllTimeVisitCount(Astro.locals);
 const navigation = [
   [copy.common.nav.home, localePath(locale, "home")],
+  [copy.common.nav.news, localePath(locale, "news")],
   [copy.common.nav.videos, localePath(locale, "videos")],
   [copy.common.nav.about, localePath(locale, "about")],
   [copy.common.nav.vision, localePath(locale, "vision")],
@@ -44,7 +47,7 @@ const navigation = [
         {navigation.map(([label, href]) => (
           <li><a href={href}>{label}</a></li>
         ))}
-        <li><a href={localePath(locale, "home", "#newsroom")}>{copy.common.nav.latest}</a></li>
+        <li><a href={localePath(locale, "disclaimer")}>{copy.common.footer.disclaimer}</a></li>
       </ul>
     </div>
 
@@ -72,8 +75,8 @@ const navigation = [
   </div>
 
   <div class="container policy-note">
-    <strong>{copy.common.footer.policies}</strong>
-    <span>{copy.common.footer.policyNote}</span>
+    <strong>{copy.common.footer.visits}: {visitCount.toLocaleString(locale === "hi" ? "hi-IN" : "en-IN")}</strong>
+    <span>{copy.common.footer.visitNote} {copy.common.footer.policyNote}</span>
   </div>
 
   <div class="container footer-bottom">

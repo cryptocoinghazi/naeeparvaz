@@ -1,0 +1,11 @@
+---
+import { getPublishingCopy } from "../data/publishing-copy";
+import type { Locale } from "../types/content";
+interface Props { locale: Locale }
+const { locale } = Astro.props;
+const copy = getPublishingCopy(locale);
+---
+<aside class="source-notice" aria-label={locale === "hi" ? "स्रोत संबंधी सूचना" : "Source responsibility notice"}>
+  <strong>{locale === "hi" ? "स्रोत संबंधी सूचना" : "Source notice"}</strong>
+  <p>{copy.sourceNotice}</p>
+</aside>

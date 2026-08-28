@@ -13,9 +13,18 @@ interface Props {
   description: string;
   canonicalPath: string;
   socialTitle?: string;
+  socialType?: "website" | "article";
+  socialImage?: string;
+  socialImageAlt?: string;
+  publishedAt?: string;
+  modifiedAt?: string;
+  structuredData?: Record<string, unknown>;
 }
 
-const { locale, title, description, canonicalPath, socialTitle = title } = Astro.props;
+const {
+  locale, title, description, canonicalPath, socialTitle = title, socialType = "website",
+  socialImage, socialImageAlt, publishedAt, modifiedAt, structuredData,
+} = Astro.props;
 const copy = getCopy(locale);
 const settings = await getSiteSettings(Astro.locals);
 const socials = await getSocialLinks(Astro.locals);
@@ -26,6 +35,7 @@ const alternateUrl = new URL(alternatePath, siteConfig.publication.url).toString
 const englishPath = locale === "en" ? canonicalPath : alternatePath;
 const logoUrl = new URL(siteConfig.publication.logoPath, siteConfig.publication.url).toString();
 const bannerUrl = new URL(siteConfig.publication.bannerPath, siteConfig.publication.url).toString();
+const resolvedSocialImage = socialImage ? new URL(socialImage, siteConfig.publication.url).toString() : bannerUrl;
 const organizationSchema = {
   "@context": "https://schema.org",
   "@type": "NewsMediaOrganization",
@@ -36,6 +46,7 @@ const organizationSchema = {
   telephone: settings.phoneHref,
   slogan: siteConfig.publication.motto,
 };
+const jsonLd = (value: Record<string, unknown>) => JSON.stringify(value).replaceAll("<", "\\u003c");
 ---
 
 <!doctype html>
@@ -51,26 +62,29 @@ const organizationSchema = {
     <link rel="alternate" hreflang="x-default" href={new URL(englishPath, siteConfig.publication.url).toString()} />
     <link rel="icon" type="image/png" href={siteConfig.publication.logoPath} />
 
-    <meta property="og:type" content="website" />
+    <meta property="og:type" content={socialType} />
     <meta property="og:site_name" content={copy.common.brandName} />
     <meta property="og:locale" content={locale === "hi" ? "hi_IN" : "en_IN"} />
     <meta property="og:locale:alternate" content={locale === "hi" ? "en_IN" : "hi_IN"} />
     <meta property="og:title" content={socialTitle} />
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonicalUrl} />
-    <meta property="og:image" content={bannerUrl} />
-    <meta property="og:image:width" content="2172" />
-    <meta property="og:image:height" content="724" />
-    <meta property="og:image:alt" content={`${siteConfig.publication.name} official banner`} />
+    <meta property="og:image" content={resolvedSocialImage} />
+    {!socialImage && <meta property="og:image:width" content="2172" />}
+    {!socialImage && <meta property="og:image:height" content="724" />}
+    <meta property="og:image:alt" content={socialImageAlt ?? `${siteConfig.publication.name} official banner`} />
+    {publishedAt && <meta property="article:published_time" content={publishedAt} />}
+    {modifiedAt && <meta property="article:modified_time" content={modifiedAt} />}
 
     <meta name="twitter:card" content="summary" />
     <meta name="twitter:title" content={socialTitle} />
     <meta name="twitter:description" content={description} />
-    <meta name="twitter:image" content={bannerUrl} />
+    <meta name="twitter:image" content={resolvedSocialImage} />
 
     <title>{title}</title>
     <script is:inline>document.documentElement.classList.add("js");</script>
-    <script is:inline type="application/ld+json" set:html={JSON.stringify(organizationSchema)}></script>
+    <script is:inline type="application/ld+json" set:html={jsonLd(organizationSchema)}></script>
+    {structuredData && <script is:inline type="application/ld+json" set:html={jsonLd(structuredData)}></script>}
   </head>
   <body>
     <a class="skip-link" href="#main-content">{copy.common.skip}</a>

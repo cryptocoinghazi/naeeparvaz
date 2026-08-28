@@ -17,7 +17,7 @@ const otherLocale: Locale = locale === "en" ? "hi" : "en";
 const languageHref = switchLocalePath(currentPath, otherLocale);
 const navigation = [
   { label: copy.common.nav.home, href: localePath(locale, "home") },
-  { label: copy.common.nav.latest, href: localePath(locale, "home", "#newsroom") },
+  { label: copy.common.nav.news, href: localePath(locale, "news") },
   { label: copy.common.nav.videos, href: localePath(locale, "videos") },
   { label: copy.common.nav.about, href: localePath(locale, "about") },
   { label: copy.common.nav.vision, href: localePath(locale, "vision") },

@@ -1,5 +1,6 @@
 import type { APIRoute } from "astro";
-import { videoCategories } from "../../../data/site";
+import { validateDriveImageUrl } from "../../../lib/drive-image";
+import { validateLabelIds } from "../../../lib/label-repository";
 import { optionalText, requiredText } from "../../../lib/validation";
 import { parseVideoUrl } from "../../../lib/video";
 import { saveVideo } from "../../../lib/video-repository";
@@ -13,8 +14,9 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
     const titleEn = optionalText(form.get("titleEn"), "English title", 240);
     const titleHi = optionalText(form.get("titleHi"), "Hindi title", 240);
     if (!titleEn && !titleHi) throw new Error("At least one language title is required.");
-    const category = requiredText(form.get("category"), "Category", 2, 50);
-    if (!(videoCategories as readonly string[]).includes(category)) throw new Error("Choose a valid category.");
+    const labelIds = validateLabelIds(form.getAll("labels"));
+    const thumbnailUrl = optionalText(form.get("thumbnailUrl"), "Google Drive thumbnail", 1000);
+    const thumbnail = thumbnailUrl ? await validateDriveImageUrl(thumbnailUrl) : undefined;
     const publishedDate = requiredText(form.get("publishedAt"), "Published date", 10, 10);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(publishedDate) || Number.isNaN(Date.parse(publishedDate))) throw new Error("Enter a valid published date.");
     const statusValue = form.get("status");
@@ -25,7 +27,9 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
       id,
       ...parsed,
       publishedAt: `${publishedDate}T00:00:00+05:30`,
-      category,
+      labelIds,
+      thumbnailDriveId: thumbnail?.fileId,
+      thumbnailSourceUrl: thumbnail?.sourceUrl,
       featured: form.get("featured") === "on",
       status,
       translations: {

@@ -1,0 +1,36 @@
+---
+import type { ContentLabel } from "../types/content";
+
+interface Props {
+  labels: ContentLabel[];
+  selected?: string[];
+}
+
+const { labels, selected = [] } = Astro.props;
+const coverage = labels.filter((label) => label.kind === "coverage");
+const topics = labels.filter((label) => label.kind === "topic");
+---
+
+<fieldset class="admin-label-fieldset admin-span-2">
+  <legend>Coverage label <small>(choose exactly one)</small></legend>
+  <div class="admin-label-options">
+    {coverage.map((label) => (
+      <label class="admin-label-chip">
+        <input name="labels" type="radio" value={label.id} required checked={selected.includes(label.id)} />
+        <span>{label.nameEn}<small lang="hi">{label.nameHi}</small></span>
+      </label>
+    ))}
+  </div>
+</fieldset>
+
+<fieldset class="admin-label-fieldset admin-span-2">
+  <legend>Topic labels <small>(optional, choose more than one if needed)</small></legend>
+  <div class="admin-label-options">
+    {topics.map((label) => (
+      <label class="admin-label-chip">
+        <input name="labels" type="checkbox" value={label.id} checked={selected.includes(label.id)} />
+        <span>{label.nameEn}<small lang="hi">{label.nameHi}</small></span>
+      </label>
+    ))}
+  </div>
+</fieldset>

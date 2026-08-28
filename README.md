@@ -1,6 +1,6 @@
 # Naee Parvaz News
 
-Production-oriented Astro website for **Naee Parvaz News**. It serves English and Hindi pages, a link-based video desk, a real email contact flow and a protected editor for contact details, social identities and video publishing.
+Production-oriented Astro website for **Naee Parvaz News**. It serves English and Hindi news and institutional pages, a link-based video desk, a real email contact flow and a protected publishing editor.
 
 The production architecture is an Astro Node service on DigitalOcean App Platform with PostgreSQL. GoDaddy remains the domain registrar and DNS provider. The application does not use Cloudflare Workers, D1, Access, DNS or the `cloudflared` tunnel program. Cloudflare Turnstile remains an independent anti-spam widget.
 
@@ -51,6 +51,9 @@ Each route exists under `/en/` and `/hi/`:
 - `/en/about/` — organizational introduction and editorial approach
 - `/en/vision-mission/` — vision, mission and eight objectives
 - `/en/videos/` — filterable and paginated video library
+- `/en/news/` — filterable and paginated article library
+- `/en/news/[slug]/` — bilingual article with related published videos
+- `/en/disclaimer/` — source, embedded-video and advertising responsibility notice
 - `/en/contact/` — exact contact details and email form
 
 `/` remembers the visitor's last selected language and otherwise redirects to English. The old unprefixed institutional URLs permanently redirect to their English counterparts.
@@ -62,12 +65,18 @@ The protected `/editor/` interface can:
 - update Mohd. Asim Ali's name, English/Hindi role, editorial email and phone;
 - update, enable or disable Instagram, YouTube, Facebook and X identities;
 - add and edit YouTube, Instagram and Facebook video links;
+- assign one coverage label and multiple topic labels, including Podcast;
+- create, preview, publish and unpublish bilingual news articles;
+- connect up to three published library videos to an article;
+- add public Google Drive covers, video thumbnails and advertising creatives;
+- create, schedule, prioritize, publish and unpublish direct-client advertisements;
+- review aggregate visit totals and landing-page counts;
 - maintain English and Hindi video titles/descriptions; and
 - keep videos as drafts, publish/unpublish them and select one featured published video.
 
 Production sign-in uses a short-lived one-time code sent only to `editor@naeeparvaz.com` through Resend. Challenges are hashed, limited to five attempts, expire after ten minutes and are rate-limited per DigitalOcean client IP. Successful sign-in creates a random, hashed PostgreSQL session lasting eight hours. The browser receives only an HttpOnly, Secure, SameSite=Strict cookie.
 
-PostgreSQL stores settings, social links, video metadata, temporary login challenges and sessions. Video files remain on the social platforms, and contact messages are sent directly through Resend rather than stored.
+PostgreSQL stores settings, social links, article/video metadata, labels, relationships, advertisement schedules, aggregate visit counts, temporary login challenges and sessions. It does not store media files, raw visitor IP addresses or individual visitor profiles. Video files remain on the social platforms, public editorial images remain in Google Drive, and contact messages are sent directly through Resend rather than stored.
 
 Database schema changes live in `db/migrations/`. `npm start` applies pending migrations before starting the production server. Run them locally with:
 
@@ -75,7 +84,9 @@ Database schema changes live in `db/migrations/`. `npm start` applies pending mi
 npm run db:migrate
 ```
 
-The second migration preserves the two published videos and verified social URLs already entered in the former local D1 editor. The ignored `.wrangler` state is not deleted.
+The second migration preserves the two published videos and verified social URLs already entered in the former local D1 editor. The third migration adds publishing data without deleting those records and maps older video categories into the fixed label taxonomy. The ignored `.wrangler` state is not deleted.
+
+See [Publishing and advertising guide](docs/publishing-and-advertising.md) for editor workflows, safe Markdown, Google Drive sharing, label behavior, advertising schedules and the visit metric.
 
 ## DigitalOcean deployment
 
@@ -119,7 +130,7 @@ npm run build
 npm test
 ```
 
-Playwright covers metadata, English/Hindi routes, redirects, links, JSON-LD, contact values, Gmail-address absence, sitemap/robots output, provider URL safety, editor protection, accessibility, mobile-menu keyboard behavior and horizontal overflow. It captures all public routes at 1440, 1280, 768, 390 and 320 pixels.
+The full Playwright suite covers the original routes and viewport matrix. For publishing changes, `tests/publishing.spec.ts` provides focused desktop/mobile checks for news, disclaimers, safe Markdown, Drive URL parsing, label pagination, sitemap output, accessibility and horizontal overflow.
 
 ## Branding and legacy reference
 

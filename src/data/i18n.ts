@@ -8,6 +8,8 @@ export const routeSegments = {
   vision: "vision-mission",
   contact: "contact",
   videos: "videos",
+  news: "news",
+  disclaimer: "disclaimer",
 } as const;
 
 export type RouteKey = keyof typeof routeSegments;
@@ -42,6 +44,7 @@ const en = {
     nav: {
       home: "Home",
       latest: "Latest",
+      news: "News",
       videos: "Videos",
       about: "About",
       vision: "Vision & Mission",
@@ -52,8 +55,11 @@ const en = {
       newsroom: "Newsroom",
       identities: "Official identities",
       policies: "Standards and policies",
-      policyNote: "Editorial, corrections, fact-checking and privacy policies will be published before reporting begins.",
+      policyNote: "Read our source, embedded-video and advertising responsibility notice.",
       rights: "All rights reserved.",
+      disclaimer: "Disclaimer",
+      visits: "Website visits",
+      visitNote: "Aggregate 30-minute browser sessions; not identified people or guaranteed unique visitors.",
     },
     contactCta: {
       kicker: "Public and editorial contact",
@@ -208,6 +214,8 @@ const en = {
     libraryTitle: "Browse the library",
     filterLabel: "Filter videos by platform",
     allPlatforms: "All platforms",
+    categoryFilterLabel: "Filter videos by category",
+    allCategories: "All categories",
     showing: "Showing",
     of: "of",
     videoCountLabel: "videos",
@@ -231,14 +239,17 @@ const hi = {
     editorialContact: "संपादकीय संपर्क",
     language: "English",
     languageLabel: "Read in English",
-    nav: { home: "होम", latest: "नवीनतम", videos: "वीडियो", about: "हमारे बारे में", vision: "दृष्टि और मिशन", contact: "संपर्क" },
+    nav: { home: "होम", latest: "नवीनतम", news: "समाचार", videos: "वीडियो", about: "हमारे बारे में", vision: "दृष्टि और मिशन", contact: "संपर्क" },
     footer: {
       explore: "देखें",
       newsroom: "न्यूज़रूम",
       identities: "आधिकारिक सोशल पहचान",
       policies: "मानक और नीतियाँ",
-      policyNote: "रिपोर्टिंग शुरू होने से पहले संपादकीय, सुधार, तथ्य-जाँच और गोपनीयता नीतियाँ प्रकाशित की जाएँगी।",
+      policyNote: "स्रोत, एम्बेडेड वीडियो और विज्ञापन जिम्मेदारी संबंधी हमारी सूचना पढ़ें।",
       rights: "सर्वाधिकार सुरक्षित।",
+      disclaimer: "अस्वीकरण",
+      visits: "वेबसाइट विज़िट",
+      visitNote: "30 मिनट के समेकित ब्राउज़र सत्र; पहचाने गए व्यक्ति या निश्चित विशिष्ट विज़िटर नहीं।",
     },
     contactCta: {
       kicker: "जनसंपर्क और संपादकीय संपर्क",
@@ -388,6 +399,8 @@ const hi = {
     libraryTitle: "वीडियो लाइब्रेरी देखें",
     filterLabel: "प्लेटफ़ॉर्म के अनुसार वीडियो फ़िल्टर करें",
     allPlatforms: "सभी प्लेटफ़ॉर्म",
+    categoryFilterLabel: "श्रेणी के अनुसार वीडियो फ़िल्टर करें",
+    allCategories: "सभी श्रेणियाँ",
     showing: "दिखाए जा रहे हैं",
     of: "कुल",
     videoCountLabel: "वीडियो",

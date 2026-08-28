@@ -1,0 +1,79 @@
+---
+import AdvertisementSlot from "../../../components/AdvertisementSlot.astro";
+import ContentLabels from "../../../components/ContentLabels.astro";
+import SourceNotice from "../../../components/SourceNotice.astro";
+import VideoCard from "../../../components/VideoCard.astro";
+import { getPublishingCopy } from "../../../data/publishing-copy";
+import { isLocale } from "../../../data/i18n";
+import { siteConfig } from "../../../data/site";
+import BaseLayout from "../../../layouts/BaseLayout.astro";
+import { getPublishedArticleBySlug } from "../../../lib/article-repository";
+import { driveImagePath } from "../../../lib/drive-image";
+import { renderSafeMarkdown } from "../../../lib/markdown";
+
+const localeParam = Astro.params.locale;
+const slug = Astro.params.slug ?? "";
+if (!isLocale(localeParam)) return new Response("Not found", { status: 404 });
+const locale = localeParam;
+const article = await getPublishedArticleBySlug(Astro.locals, locale, slug);
+if (!article) return new Response("Not found", { status: 404 });
+const copy = getPublishingCopy(locale);
+const canonicalPath = `/${locale}/news/${article.slug}/`;
+const coverPath = article.coverDriveId ? driveImagePath(article.coverDriveId) : undefined;
+const coverAlt = article.coverAlt ?? article.title;
+const date = new Intl.DateTimeFormat(locale === "hi" ? "hi-IN" : "en-IN", { dateStyle: "long", timeZone: "Asia/Kolkata" }).format(new Date(article.publishedAt));
+const articleSchema = {
+  "@context": "https://schema.org",
+  "@type": "NewsArticle",
+  headline: article.title,
+  description: article.summary,
+  datePublished: article.publishedAt,
+  dateModified: article.updatedAt,
+  mainEntityOfPage: new URL(canonicalPath, siteConfig.publication.url).toString(),
+  author: { "@type": "Person", name: article.byline },
+  publisher: {
+    "@type": "NewsMediaOrganization",
+    name: siteConfig.publication.name,
+    url: siteConfig.publication.url,
+    logo: new URL(siteConfig.publication.logoPath, siteConfig.publication.url).toString(),
+  },
+  ...(coverPath ? { image: new URL(coverPath, siteConfig.publication.url).toString() } : {}),
+};
+---
+
+<BaseLayout
+  locale={locale}
+  title={`${article.title} | ${locale === "hi" ? "नई परवाज़ न्यूज़" : "Naee Parvaz News"}`}
+  description={article.summary}
+  canonicalPath={canonicalPath}
+  socialType="article"
+  socialImage={coverPath}
+  socialImageAlt={coverAlt}
+  publishedAt={article.publishedAt}
+  modifiedAt={article.updatedAt}
+  structuredData={articleSchema}
+>
+  <article class="news-article">
+    <header class="news-article-header container">
+      <ContentLabels labels={article.labels} locale={locale} basePath={`/${locale}/news/`} />
+      <h1 lang={article.translationLocale}>{article.title}</h1>
+      <p class="news-article-summary" lang={article.translationLocale}>{article.summary}</p>
+      <div class="news-article-meta"><span>{copy.news.by} <strong>{article.byline}</strong></span><time datetime={article.publishedAt}>{date}</time></div>
+      {coverPath && <img class="news-article-cover" src={coverPath} alt={coverAlt} width="1200" height="675" decoding="async" fetchpriority="high" />}
+    </header>
+    <div class="container news-article-layout">
+      <div class="news-article-body" lang={article.translationLocale} set:html={renderSafeMarkdown(article.bodyMarkdown)}></div>
+      <aside class="article-source-card">
+        <strong>{copy.news.source}</strong>
+        {article.sourceType === "original" ? <p>{copy.news.original}</p> : article.sourceUrl ? <a href={article.sourceUrl} target="_blank" rel="noopener">{article.sourceName} ↗</a> : <p>{article.sourceName}</p>}
+      </aside>
+    </div>
+    {article.sourceType === "external" && <div class="container source-notice-wrap"><SourceNotice locale={locale} /></div>}
+    {article.relatedVideos.length > 0 && (
+      <section class="section related-videos" aria-labelledby="related-videos-heading">
+        <div class="container"><p class="kicker">{copy.news.relatedVideos}</p><h2 id="related-videos-heading">{copy.news.relatedVideos}</h2><p>{copy.news.relatedIntro}</p><div class="video-grid">{article.relatedVideos.map((video) => <VideoCard video={video} locale={locale} />)}</div></div>
+      </section>
+    )}
+    <AdvertisementSlot locale={locale} placement="article-end" />
+  </article>
+</BaseLayout>

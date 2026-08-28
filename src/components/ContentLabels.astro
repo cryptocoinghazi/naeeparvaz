@@ -1,0 +1,22 @@
+---
+import { labelName } from "../lib/label-repository";
+import type { ContentLabel, Locale } from "../types/content";
+
+interface Props {
+  labels: ContentLabel[];
+  locale: Locale;
+  basePath?: string;
+}
+
+const { labels, locale, basePath } = Astro.props;
+---
+
+<ul class="content-labels" aria-label={locale === "hi" ? "सामग्री श्रेणियाँ" : "Content categories"}>
+  {labels.map((label) => (
+    <li>
+      {basePath
+        ? <a href={`${basePath}?label=${encodeURIComponent(label.id)}`}>{labelName(label, locale)}</a>
+        : <span>{labelName(label, locale)}</span>}
+    </li>
+  ))}
+</ul>

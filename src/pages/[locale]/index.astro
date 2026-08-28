@@ -1,12 +1,15 @@
 ---
 import ContactCta from "../../components/ContactCta.astro";
+import AdvertisementSlot from "../../components/AdvertisementSlot.astro";
 import EditorialList from "../../components/EditorialList.astro";
+import LatestArticles from "../../components/LatestArticles.astro";
 import LatestVideos from "../../components/LatestVideos.astro";
 import NewsroomPreview from "../../components/NewsroomPreview.astro";
 import SectionHeader from "../../components/SectionHeader.astro";
 import { getCopy, isLocale, localePath } from "../../data/i18n";
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import { getSiteSettings } from "../../lib/site-repository";
+import { getPublishedArticles } from "../../lib/article-repository";
 import { getPublishedVideos } from "../../lib/video-repository";
 
 const localeParam = Astro.params.locale;
@@ -15,6 +18,7 @@ const locale = localeParam;
 const copy = getCopy(locale);
 const settings = await getSiteSettings(Astro.locals);
 const videos = await getPublishedVideos(Astro.locals, locale, 5);
+const articles = await getPublishedArticles(Astro.locals, locale, 6);
 ---
 
 <BaseLayout locale={locale} title={copy.seo.homeTitle} description={copy.seo.homeDescription} canonicalPath={localePath(locale, "home")}>
@@ -36,6 +40,8 @@ const videos = await getPublishedVideos(Astro.locals, locale, 5);
       </aside>
     </div>
   </section>
+
+  <AdvertisementSlot locale={locale} placement="home" />
 
   <section class="identity-band" aria-label={copy.home.identityLabel}>
     <div class="container identity-grid">
@@ -74,7 +80,7 @@ const videos = await getPublishedVideos(Astro.locals, locale, 5);
   </section>
 
   <LatestVideos locale={locale} videos={videos} />
-  <NewsroomPreview locale={locale} />
+  {articles.length ? <LatestArticles locale={locale} articles={articles} /> : <NewsroomPreview locale={locale} />}
 
   <section class="section editor-section" aria-labelledby="editor-heading">
     <div class="container editor-profile">

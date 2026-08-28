@@ -1,0 +1,20 @@
+---
+import AdminHeader from "../../../../components/AdminHeader.astro";
+import ArticleEditorForm from "../../../../components/ArticleEditorForm.astro";
+import { getAdminArticle } from "../../../../lib/article-repository";
+import { getContentLabels } from "../../../../lib/label-repository";
+import { getAdminResolvedVideos } from "../../../../lib/video-repository";
+import "../../../../styles/global.css";
+import "../../../../styles/admin.css";
+const id = Astro.params.id ?? "";
+if (!/^[0-9a-f-]{36}$/i.test(id)) return new Response("Not found", { status: 404 });
+const [article, labels, videos] = await Promise.all([getAdminArticle(Astro.locals, id), getContentLabels(Astro.locals), getAdminResolvedVideos(Astro.locals, "en")]);
+if (!article) return new Response("Not found", { status: 404 });
+const saved = Astro.url.searchParams.get("saved");
+const error = Astro.url.searchParams.get("error");
+---
+<!doctype html>
+<html lang="en">
+  <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><meta name="robots" content="noindex, nofollow" /><meta name="theme-color" content="#082f78" /><title>Edit article | Naee Parvaz editor</title></head>
+  <body class="admin-body"><a class="skip-link" href="#admin-content">Skip to article form</a><AdminHeader kicker="Publishing desk" title="Edit article" description={`Stable public URL: /news/${article.slug}/`} /><main id="admin-content" class="admin-container admin-main">{saved && <p class="admin-notice admin-notice-success" role="status">Article saved successfully.</p>}{error && <p class="admin-notice admin-notice-error" role="alert">The article was not saved. Complete every required field, choose one coverage label and verify any Drive image is public.</p>}<section class="admin-section"><ArticleEditorForm article={article} labels={labels} videos={videos} /></section></main></body>
+</html>

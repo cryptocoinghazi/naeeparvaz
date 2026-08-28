@@ -10,11 +10,15 @@ const routes = [
   { path: "/en/vision-mission/", heading: "Vision, mission & objectives", lang: "en" },
   { path: "/en/contact/", heading: "Connect with the newsroom", lang: "en" },
   { path: "/en/videos/", heading: "Latest Videos", lang: "en" },
+  { path: "/en/news/", heading: "Latest News", lang: "en" },
+  { path: "/en/disclaimer/", heading: "Source, video and advertising disclaimer", lang: "en" },
   { path: "/hi/", heading: "ऐसी पत्रकारिता जो समाज को दूर तक देखने में मदद करे।", lang: "hi" },
   { path: "/hi/about/", heading: "नई परवाज़ के बारे में", lang: "hi" },
   { path: "/hi/vision-mission/", heading: "दृष्टि, मिशन और उद्देश्य", lang: "hi" },
   { path: "/hi/contact/", heading: "न्यूज़रूम से संपर्क करें", lang: "hi" },
   { path: "/hi/videos/", heading: "नवीनतम वीडियो", lang: "hi" },
+  { path: "/hi/news/", heading: "नवीनतम समाचार", lang: "hi" },
+  { path: "/hi/disclaimer/", heading: "स्रोत, वीडियो और विज्ञापन अस्वीकरण", lang: "hi" },
 ] as const;
 
 test("all localized public routes render with canonical, language and organization metadata", async ({ page }) => {
@@ -151,6 +155,7 @@ test("YouTube, Instagram and Facebook links resolve only to approved embeds", as
     ...youtube,
     publishedAt: "2026-08-18T00:00:00+05:30",
     category: "video-reports",
+    labels: [{ id: "video-reports", kind: "topic", nameEn: "Video Reports", nameHi: "वीडियो रिपोर्ट", displayOrder: 21 }],
     featured: false,
     status: "published",
     translations: { en: { title: "English-only title" } },
@@ -171,6 +176,7 @@ test("video library filters and paginates published records", async ({}, testInf
     provider: index < 12 ? "youtube" : "facebook",
     publishedAt: "2026-08-18T00:00:00+05:30",
     category: "video-reports",
+    labels: [{ id: "video-reports", kind: "topic", nameEn: "Video Reports", nameHi: "वीडियो रिपोर्ट", displayOrder: 21 }],
     featured: false,
     status: "published",
     translations: { en: { title: `Video ${index + 1}` } },
@@ -179,11 +185,11 @@ test("video library filters and paginates published records", async ({}, testInf
   }));
   const resolved = records.map((record) => resolveVideo(record, "en"));
 
-  const secondPage = createVideoLibraryView(resolved, null, "2");
+  const secondPage = createVideoLibraryView(resolved, null, null, "2");
   expect(secondPage).toMatchObject({ currentPage: 2, totalPages: 3, totalVideos: 20, firstVisible: 10, lastVisible: 18 });
   expect(secondPage.videos).toHaveLength(9);
 
-  const facebook = createVideoLibraryView(resolved, "facebook", "99");
+  const facebook = createVideoLibraryView(resolved, "facebook", null, "99");
   expect(facebook).toMatchObject({ activeProvider: "facebook", currentPage: 1, totalPages: 1, totalVideos: 8 });
   expect(facebook.videos).toHaveLength(8);
 });

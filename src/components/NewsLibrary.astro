@@ -1,0 +1,65 @@
+---
+import { getPublishingCopy } from "../data/publishing-copy";
+import { labelName } from "../lib/label-repository";
+import type { ArticleLibraryView } from "../lib/article-library";
+import type { ContentLabel, Locale } from "../types/content";
+import AdvertisementSlot from "./AdvertisementSlot.astro";
+import ArticleCard from "./ArticleCard.astro";
+
+interface Props { locale: Locale; library: ArticleLibraryView; labels: ContentLabel[] }
+const { locale, library, labels } = Astro.props;
+const copy = getPublishingCopy(locale);
+const basePath = `/${locale}/news/`;
+const libraryUrl = (labelId?: string, page = 1) => {
+  const params = new URLSearchParams();
+  if (labelId) params.set("label", labelId);
+  if (page > 1) params.set("page", String(page));
+  const query = params.toString();
+  return query ? `${basePath}?${query}` : basePath;
+};
+const visiblePages: Array<number | "ellipsis"> = [];
+let previous = 0;
+for (let page = 1; page <= library.totalPages; page += 1) {
+  if (page !== 1 && page !== library.totalPages && Math.abs(page - library.currentPage) > 1) continue;
+  if (previous && page - previous > 1) visiblePages.push("ellipsis");
+  visiblePages.push(page);
+  previous = page;
+}
+const firstRow = library.articles.slice(0, 3);
+const remaining = library.articles.slice(3);
+---
+
+<section class="section news-library" aria-labelledby="news-library-heading">
+  <div class="container">
+    <div class="video-library-heading">
+      <h2 id="news-library-heading">{copy.news.libraryTitle}</h2>
+      <p class="video-library-summary" role="status">{copy.news.showing} <strong>{library.firstVisible}–{library.lastVisible}</strong> {copy.news.of} <strong>{library.totalArticles}</strong> {copy.news.count}</p>
+    </div>
+    <nav class="content-filters" aria-label={copy.news.filterLabel}>
+      <a class:list={["content-filter", { "is-active": !library.activeLabel }]} href={basePath} aria-current={!library.activeLabel ? "page" : undefined}>{copy.news.allLabels}</a>
+      {labels.map((label) => (
+        <a class:list={["content-filter", { "is-active": library.activeLabel?.id === label.id }]} href={libraryUrl(label.id)} aria-current={library.activeLabel?.id === label.id ? "page" : undefined}>
+          <span>{labelName(label, locale)}</span><strong>{library.counts[label.id] ?? 0}</strong>
+        </a>
+      ))}
+    </nav>
+
+    {library.articles.length ? (
+      <>
+        <div class="article-card-grid">{firstRow.map((article) => <ArticleCard article={article} locale={locale} />)}</div>
+        <AdvertisementSlot locale={locale} placement="news-listing" />
+        {remaining.length > 0 && <div class="article-card-grid article-card-grid-continuation">{remaining.map((article) => <ArticleCard article={article} locale={locale} />)}</div>}
+      </>
+    ) : (
+      <div class="video-empty video-library-empty"><h2>{library.activeLabel ? copy.news.filteredEmpty : copy.news.emptyTitle}</h2><p>{library.activeLabel ? copy.news.emptyText : copy.news.emptyText}</p></div>
+    )}
+
+    {library.totalPages > 1 && (
+      <nav class="video-pagination" aria-label={copy.news.pages}>
+        {library.currentPage > 1 ? <a class="video-page-direction" href={libraryUrl(library.activeLabel?.id, library.currentPage - 1)} rel="prev">← {copy.news.previous}</a> : <span class="video-page-direction is-disabled" aria-disabled="true">← {copy.news.previous}</span>}
+        <div class="video-page-numbers">{visiblePages.map((page) => page === "ellipsis" ? <span class="video-page-ellipsis" aria-hidden="true">…</span> : <a class:list={["video-page-number", { "is-active": page === library.currentPage }]} href={libraryUrl(library.activeLabel?.id, page)} aria-current={page === library.currentPage ? "page" : undefined} aria-label={`${copy.news.page} ${page}`}>{page}</a>)}</div>
+        {library.currentPage < library.totalPages ? <a class="video-page-direction" href={libraryUrl(library.activeLabel?.id, library.currentPage + 1)} rel="next">{copy.news.next} →</a> : <span class="video-page-direction is-disabled" aria-disabled="true">{copy.news.next} →</span>}
+      </nav>
+    )}
+  </div>
+</section>

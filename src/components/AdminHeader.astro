@@ -1,0 +1,29 @@
+---
+interface Props {
+  kicker: string;
+  title: string;
+  description?: string;
+}
+const { kicker, title, description } = Astro.props;
+---
+
+<header class="admin-header">
+  <div class="admin-container admin-header-inner">
+    <div>
+      <p class="kicker">{kicker}</p>
+      <h1>{title}</h1>
+      {description && <p>{description}</p>}
+      <p>Signed in as <strong>{Astro.locals.adminEmail}</strong></p>
+    </div>
+    <nav aria-label="Editor sections">
+      <a class="button button-light" href="/en/" target="_blank" rel="noopener">View website</a>
+      <a class="button button-outline admin-button-outline" href="/editor/">Settings & videos</a>
+      <a class="button button-outline admin-button-outline" href="/editor/articles/">Articles</a>
+      <a class="button button-outline admin-button-outline" href="/editor/ads/">Advertisements</a>
+      <a class="button button-outline admin-button-outline" href="/editor/analytics/">Analytics</a>
+      <form class="admin-logout-form" method="post" action="/api/auth/logout/">
+        <button class="button button-outline admin-button-outline" type="submit">Sign out</button>
+      </form>
+    </nav>
+  </div>
+</header>

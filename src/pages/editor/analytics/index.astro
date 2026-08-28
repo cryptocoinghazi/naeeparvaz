@@ -1,0 +1,12 @@
+---
+import AdminHeader from "../../../components/AdminHeader.astro";
+import { getVisitSummary } from "../../../lib/analytics-repository";
+import "../../../styles/global.css";
+import "../../../styles/admin.css";
+const summary = await getVisitSummary(Astro.locals);
+---
+<!doctype html>
+<html lang="en">
+  <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><meta name="robots" content="noindex, nofollow" /><meta name="theme-color" content="#082f78" /><title>Visit analytics | Naee Parvaz editor</title></head>
+  <body class="admin-body"><a class="skip-link" href="#admin-content">Skip to analytics</a><AdminHeader kicker="Privacy-friendly analytics" title="Website visits" description="Aggregate browser sessions only—no names, emails, raw IP addresses or persistent fingerprints." /><main id="admin-content" class="admin-container admin-main"><section class="admin-metric-grid" aria-label="Visit totals"><article><span>Today</span><strong>{summary.today.toLocaleString("en-IN")}</strong></article><article><span>Last 7 days</span><strong>{summary.sevenDays.toLocaleString("en-IN")}</strong></article><article><span>Last 30 days</span><strong>{summary.thirtyDays.toLocaleString("en-IN")}</strong></article><article><span>All time</span><strong>{summary.allTime.toLocaleString("en-IN")}</strong></article></section><p class="admin-analytics-note">A visit is one public-page session per browser within 30 minutes. It is not an identified person or a guaranteed unique visitor.</p><div class="admin-analytics-grid"><section class="admin-section"><div class="admin-section-heading"><div><p class="kicker">Last 30 days</p><h2>Landing pages</h2></div></div>{summary.landingPages.length ? <table class="admin-table"><thead><tr><th>Initial public page</th><th>Visits</th></tr></thead><tbody>{summary.landingPages.map((row) => <tr><td>{row.path}</td><td>{row.visits.toLocaleString("en-IN")}</td></tr>)}</tbody></table> : <p class="admin-empty">No visits recorded yet.</p>}</section><section class="admin-section"><div class="admin-section-heading"><div><p class="kicker">Daily totals</p><h2>Recent activity</h2></div></div>{summary.daily.length ? <table class="admin-table"><thead><tr><th>Date</th><th>Visits</th></tr></thead><tbody>{summary.daily.map((row) => <tr><td>{row.date}</td><td>{row.visits.toLocaleString("en-IN")}</td></tr>)}</tbody></table> : <p class="admin-empty">No daily totals recorded yet.</p>}</section></div></main></body>
+</html>

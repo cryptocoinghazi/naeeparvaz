@@ -1,0 +1,27 @@
+---
+import NewsLibrary from "../../../components/NewsLibrary.astro";
+import { getPublishingCopy } from "../../../data/publishing-copy";
+import { isLocale, localePath } from "../../../data/i18n";
+import BaseLayout from "../../../layouts/BaseLayout.astro";
+import { createArticleLibraryView } from "../../../lib/article-library";
+import { getPublishedArticles } from "../../../lib/article-repository";
+import { getContentLabels } from "../../../lib/label-repository";
+
+const localeParam = Astro.params.locale;
+if (!isLocale(localeParam)) return new Response("Not found", { status: 404 });
+const locale = localeParam;
+const copy = getPublishingCopy(locale);
+const [articles, labels] = await Promise.all([
+  getPublishedArticles(Astro.locals, locale),
+  getContentLabels(Astro.locals),
+]);
+const library = createArticleLibraryView(articles, labels, Astro.url.searchParams.get("label"), Astro.url.searchParams.get("page"));
+const title = locale === "hi" ? "नवीनतम समाचार | नई परवाज़ न्यूज़" : "Latest News | Naee Parvaz News";
+---
+
+<BaseLayout locale={locale} title={title} description={copy.news.lead} canonicalPath={localePath(locale, "news")}>
+  <section class="page-hero news-hero" aria-labelledby="news-heading">
+    <div class="container page-hero-inner"><p class="kicker">{copy.news.kicker}</p><h1 id="news-heading">{copy.news.title}</h1><p>{copy.news.lead}</p></div>
+  </section>
+  <NewsLibrary locale={locale} library={library} labels={labels} />
+</BaseLayout>

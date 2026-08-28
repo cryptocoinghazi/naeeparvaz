@@ -1,0 +1,15 @@
+---
+import AdminHeader from "../../../components/AdminHeader.astro";
+import ArticleEditorForm from "../../../components/ArticleEditorForm.astro";
+import { getContentLabels } from "../../../lib/label-repository";
+import { getAdminResolvedVideos } from "../../../lib/video-repository";
+import "../../../styles/global.css";
+import "../../../styles/admin.css";
+const [labels, videos] = await Promise.all([getContentLabels(Astro.locals), getAdminResolvedVideos(Astro.locals, "en")]);
+const error = Astro.url.searchParams.get("error");
+---
+<!doctype html>
+<html lang="en">
+  <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><meta name="robots" content="noindex, nofollow" /><meta name="theme-color" content="#082f78" /><title>New article | Naee Parvaz editor</title></head>
+  <body class="admin-body"><a class="skip-link" href="#admin-content">Skip to article form</a><AdminHeader kicker="Publishing desk" title="Create an article" description="Save as draft, preview, then publish when editorial review is complete." /><main id="admin-content" class="admin-container admin-main">{error && <p class="admin-notice admin-notice-error" role="alert">The article was not saved. Complete every required field, choose one coverage label and verify any Drive image is public.</p>}<section class="admin-section"><ArticleEditorForm labels={labels} videos={videos} /></section></main></body>
+</html>

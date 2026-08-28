@@ -1,0 +1,23 @@
+---
+import { getPublishingCopy } from "../../data/publishing-copy";
+import { isLocale, localePath } from "../../data/i18n";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { getSiteSettings } from "../../lib/site-repository";
+
+const localeParam = Astro.params.locale;
+if (!isLocale(localeParam)) return new Response("Not found", { status: 404 });
+const locale = localeParam;
+const copy = getPublishingCopy(locale);
+const settings = await getSiteSettings(Astro.locals);
+const title = locale === "hi" ? "स्रोत और विज्ञापन अस्वीकरण | नई परवाज़ न्यूज़" : "Source and Advertising Disclaimer | Naee Parvaz News";
+---
+
+<BaseLayout locale={locale} title={title} description={copy.disclaimer.lead} canonicalPath={localePath(locale, "disclaimer")}>
+  <section class="page-hero" aria-labelledby="disclaimer-heading"><div class="container page-hero-inner"><p class="kicker">{copy.disclaimer.kicker}</p><h1 id="disclaimer-heading">{copy.disclaimer.title}</h1><p>{copy.disclaimer.lead}</p></div></section>
+  <section class="section"><div class="container disclaimer-grid">
+    <article><span>01</span><h2>{copy.disclaimer.sourceTitle}</h2><p>{copy.disclaimer.sourceText}</p></article>
+    <article><span>02</span><h2>{copy.disclaimer.videoTitle}</h2><p>{copy.disclaimer.videoText}</p></article>
+    <article><span>03</span><h2>{copy.disclaimer.adTitle}</h2><p>{copy.disclaimer.adText}</p></article>
+  </div></section>
+  <section class="direct-contact"><div class="container direct-contact-inner"><p>{copy.disclaimer.contactText}</p><a href={`mailto:${settings.email}`}>{settings.email}</a></div></section>
+</BaseLayout>

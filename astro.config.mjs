@@ -2,7 +2,7 @@ import { defineConfig } from "astro/config";
 import node from "@astrojs/node";
 import sitemap from "@astrojs/sitemap";
 
-const publicPages = ["", "about/", "vision-mission/", "contact/", "videos/"];
+const publicPages = ["", "about/", "vision-mission/", "contact/", "videos/", "news/", "disclaimer/"];
 const canonicalPages = ["en", "hi"].flatMap((locale) =>
   publicPages.map((page) => `https://naeeparvaz.com/${locale}/${page}`),
 );

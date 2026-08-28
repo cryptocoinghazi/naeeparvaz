@@ -1,5 +1,6 @@
 import type {
   ArticleSummary,
+  ContentLabel,
   EditableSiteSettings,
   EditableSocialLink,
   SiteConfig,
@@ -99,18 +100,28 @@ export const defaultSocialLinks: EditableSocialLink[] = [
   { platform: "x", identity: "@Naee Parvaz News", enabled: true, displayOrder: 4 },
 ];
 
-export const videoCategories = [
-  "maharashtra",
-  "local",
-  "india",
-  "politics",
-  "society",
-  "education",
-  "interviews",
-  "explainers",
-  "ground-reports",
-  "video-reports",
-] as const;
+export const contentLabels = [
+  { id: "local-area", kind: "coverage", nameEn: "Local Area", nameHi: "स्थानीय क्षेत्र", displayOrder: 1 },
+  { id: "state", kind: "coverage", nameEn: "State", nameHi: "राज्य", displayOrder: 2 },
+  { id: "country", kind: "coverage", nameEn: "Country", nameHi: "देश", displayOrder: 3 },
+  { id: "other", kind: "coverage", nameEn: "Other", nameHi: "अन्य", displayOrder: 4 },
+  { id: "politics", kind: "topic", nameEn: "Politics & Public Affairs", nameHi: "राजनीति और सार्वजनिक मामले", displayOrder: 10 },
+  { id: "society", kind: "topic", nameEn: "Society", nameHi: "समाज", displayOrder: 11 },
+  { id: "education", kind: "topic", nameEn: "Education", nameHi: "शिक्षा", displayOrder: 12 },
+  { id: "economy-business", kind: "topic", nameEn: "Economy & Business", nameHi: "अर्थव्यवस्था और व्यवसाय", displayOrder: 13 },
+  { id: "technology", kind: "topic", nameEn: "Technology", nameHi: "प्रौद्योगिकी", displayOrder: 14 },
+  { id: "culture", kind: "topic", nameEn: "Culture", nameHi: "संस्कृति", displayOrder: 15 },
+  { id: "opinion", kind: "topic", nameEn: "Opinion", nameHi: "विचार", displayOrder: 16 },
+  { id: "interviews", kind: "topic", nameEn: "Interviews", nameHi: "साक्षात्कार", displayOrder: 17 },
+  { id: "explainers", kind: "topic", nameEn: "Explainers", nameHi: "व्याख्या", displayOrder: 18 },
+  { id: "investigations", kind: "topic", nameEn: "Investigations", nameHi: "खोजी रिपोर्ट", displayOrder: 19 },
+  { id: "ground-reports", kind: "topic", nameEn: "Ground Reports", nameHi: "ग्राउंड रिपोर्ट", displayOrder: 20 },
+  { id: "video-reports", kind: "topic", nameEn: "Video Reports", nameHi: "वीडियो रिपोर्ट", displayOrder: 21 },
+  { id: "podcast", kind: "topic", nameEn: "Podcast", nameHi: "पॉडकास्ट", displayOrder: 22 },
+] as const satisfies readonly ContentLabel[];
+
+// Kept as a compatibility export for older integrations while the editor uses label chips.
+export const videoCategories = contentLabels.map((label) => label.id);
 
 // Real reporting can populate this typed collection when publishing begins.
 export const articles: ArticleSummary[] = [];

@@ -1,6 +1,7 @@
 import { defineMiddleware } from "astro:middleware";
 import { isLocale } from "./data/i18n";
 import { getAdminSessionEmail, sessionCookieName } from "./lib/auth";
+import { recordAnonymousVisit } from "./lib/analytics-repository";
 
 const protectedPrefixes = ["/editor", "/api/editor"];
 const publicEditorPaths = new Set(["/editor/login", "/editor/login/"]);
@@ -55,6 +56,19 @@ export const onRequest = defineMiddleware(async (context, next) => {
       sameSite: "lax",
       secure: protocol === "https:",
     });
+    const userAgent = context.request.headers.get("user-agent") ?? "";
+    const isBot = /bot|crawler|spider|slurp|facebookexternalhit|whatsapp|preview|headless/i.test(userAgent);
+    const isHtml = response.headers.get("content-type")?.toLowerCase().includes("text/html") === true;
+    if (context.request.method === "GET" && response.ok && isHtml && !isBot && !context.cookies.has("np_visit")) {
+      await recordAnonymousVisit(context.locals, pathname);
+      context.cookies.set("np_visit", "1", {
+        path: "/",
+        maxAge: 30 * 60,
+        httpOnly: true,
+        sameSite: "lax",
+        secure: protocol === "https:",
+      });
+    }
   }
 
   const sensitiveRoute = editorPath || matchesPrefix(pathname, "/api/auth");
