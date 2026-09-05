@@ -37,7 +37,7 @@ const usableChannel = (platform: SocialPlatform) => channels.find((channel) => c
   </head>
   <body class="admin-body">
     <a class="skip-link" href="#admin-content">Skip to publisher</a>
-    <AdminHeader kicker="Protected publishing desk" title="Social video publisher" description="Upload one verified short video, review the copy, then publish now or schedule through Buffer." />
+    <AdminHeader kicker="Protected publishing desk" title="Social video publisher" description="Upload one verified short video, review the copy, then publish now or schedule it across your connected social channels." />
 
     <main id="admin-content" class="admin-container admin-main">
       {saved && <p class="admin-notice admin-notice-success" role="status">Publisher action completed. Review each platform status below.</p>}
@@ -45,11 +45,11 @@ const usableChannel = (platform: SocialPlatform) => channels.find((channel) => c
 
       <section class="admin-section" aria-labelledby="publisher-setup-heading">
         <div class="admin-section-heading">
-          <div><p class="kicker">Provider setup</p><h2 id="publisher-setup-heading">Buffer channels and R2</h2></div>
+          <div><p class="kicker">Publishing setup</p><h2 id="publisher-setup-heading">Social channels and video storage</h2></div>
           <p>Exactly one official Naee Parvaz channel may be selected for each platform. Credentials remain server-only.</p>
         </div>
         <div class="publisher-readiness" aria-label="Publisher configuration status">
-          <p><span class:list={["publisher-dot", bufferReady && "is-ready"]}></span> Buffer API {bufferReady ? "configured" : "not configured"}</p>
+          <p><span class:list={["publisher-dot", bufferReady && "is-ready"]}></span> Social publishing {bufferReady ? "configured" : "not configured"}</p>
           <p><span class:list={["publisher-dot", storageReady && "is-ready"]}></span> R2 storage and media URL {storageReady ? "configured" : "not configured"}</p>
         </div>
         <div class="publisher-channel-summary">
@@ -59,7 +59,7 @@ const usableChannel = (platform: SocialPlatform) => channels.find((channel) => c
           })}
         </div>
         <div class="admin-actions">
-          <button class="button button-outline" id="discover-channels" type="button" disabled={!bufferReady}>Discover Buffer channels</button>
+          <button class="button button-outline" id="discover-channels" type="button" disabled={!bufferReady}>Discover social channels</button>
         </div>
         <form class="admin-form publisher-channel-form" id="channel-form" hidden>
           <div class="admin-form-grid">
@@ -108,7 +108,7 @@ const usableChannel = (platform: SocialPlatform) => channels.find((channel) => c
             <label><input type="radio" name="publishMode" value="scheduled" /> Schedule in Asia/Kolkata</label>
             <label id="schedule-field" hidden>Scheduled date and time<input type="datetime-local" name="scheduledFor" /></label>
           </fieldset>
-          <p class="admin-help">Submission is never retried automatically when Buffer's response is uncertain, preventing accidental duplicate posts.</p>
+          <p class="admin-help">Submission is never retried automatically when a publishing response is uncertain, preventing accidental duplicate posts.</p>
           <button class="button" id="review-publish" type="button" disabled>Review publishing batch</button>
         </form>
       </section>
@@ -118,13 +118,13 @@ const usableChannel = (platform: SocialPlatform) => channels.find((channel) => c
         <p class="kicker">Final confirmation</p><h2 id="publisher-review-title">Review before sending</h2>
         <video id="publisher-review-video" controls muted playsinline></video>
         <div id="publisher-review-content"></div>
-        <div class="admin-actions"><button class="button" id="confirm-publish" type="button">Confirm and send to Buffer</button><form method="dialog"><button class="button button-outline">Go back</button></form></div>
+        <div class="admin-actions"><button class="button" id="confirm-publish" type="button">Confirm and publish</button><form method="dialog"><button class="button button-outline">Go back</button></form></div>
       </dialog>
 
       <section class="admin-section" aria-labelledby="publish-history-heading">
         <div class="admin-section-heading">
           <div><p class="kicker">Publishing history</p><h2 id="publish-history-heading">Batches and target status</h2></div>
-          <p>Refresh reconciles known Buffer post IDs. Retry is available only after Buffer confirms a target failed.</p>
+          <p>Refresh checks the latest status for submitted posts. Retry is available only after a target is confirmed as failed.</p>
         </div>
         {batches.length ? <div class="publisher-batch-list">{batches.map((batch) => (
           <article class="publisher-batch" id={`batch-${batch.id}`}>
@@ -158,11 +158,11 @@ const usableChannel = (platform: SocialPlatform) => channels.find((channel) => c
       const channelMessage = document.querySelector("#channel-message");
       discoverButton?.addEventListener("click", async () => {
         discoverButton.setAttribute("disabled", "");
-        if (channelMessage) channelMessage.textContent = "Loading channels from Buffer…";
+        if (channelMessage) channelMessage.textContent = "Loading connected social channels…";
         try {
           const response = await fetch("/api/editor/publisher/channels/");
           const payload = await response.json() as ChannelPayload;
-          if (!response.ok) throw new Error(payload.error || "Buffer channel discovery failed.");
+          if (!response.ok) throw new Error(payload.error || "Social channel discovery failed.");
           const selected = new Map(payload.selected.map((item: BrowserChannel) => [item.platform, item.channelId]));
           for (const platform of Object.keys(platformNames)) {
             const select = channelForm?.querySelector(`[name="${platform}"]`);
