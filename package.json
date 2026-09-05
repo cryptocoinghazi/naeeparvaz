@@ -17,12 +17,18 @@
     "lint": "eslint .",
     "typecheck": "astro check",
     "check": "npm run lint && npm run typecheck",
-    "test": "playwright test"
+    "test": "playwright test",
+    "media:dev": "wrangler dev --config media-worker/wrangler.jsonc",
+    "media:deploy": "wrangler deploy --config media-worker/wrangler.jsonc",
+    "test:media-worker": "node --test media-worker/test/*.test.mjs"
   },
   "dependencies": {
     "@astrojs/node": "^11.1.4",
     "@astrojs/sitemap": "^3.7.3",
+    "@aws-sdk/client-s3": "^3.1121.0",
+    "@aws-sdk/s3-request-presigner": "^3.1121.0",
     "astro": "^7.2.4",
+    "mp4box": "^2.4.1",
     "pg": "^8.23.0"
   },
   "devDependencies": {
@@ -33,6 +39,7 @@
     "eslint": "^10.8.1",
     "eslint-plugin-astro": "^3.1.0",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.67.0"
+    "typescript-eslint": "^8.67.0",
+    "wrangler": "^4.0.0"
   }
 }

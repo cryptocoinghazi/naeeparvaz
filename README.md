@@ -2,7 +2,7 @@
 
 Production-oriented Astro website for **Naee Parvaz News**. It serves English and Hindi news and institutional pages, a link-based video desk, a real email contact flow and a protected publishing editor.
 
-The production architecture is an Astro Node service on DigitalOcean App Platform with PostgreSQL. GoDaddy remains the domain registrar and DNS provider. The application does not use Cloudflare Workers, D1, Access, DNS or the `cloudflared` tunnel program. Cloudflare Turnstile remains an independent anti-spam widget.
+The production architecture is an Astro Node service on DigitalOcean App Platform with PostgreSQL. GoDaddy remains the domain registrar and DNS provider. Cloudflare provides Turnstile and a private R2 bucket with one small `workers.dev` media-delivery Worker for Social Publisher videos; website traffic and DNS do not move through Cloudflare.
 
 ## Start locally
 
@@ -73,10 +73,11 @@ The protected `/editor/` interface can:
 - review aggregate visit totals and landing-page counts;
 - maintain English and Hindi video titles/descriptions; and
 - keep videos as drafts, publish/unpublish them and select one featured published video.
+- upload one validated short video and publish or schedule it through Buffer to selected Instagram, Facebook and YouTube channels.
 
 Production sign-in uses a short-lived one-time code sent only to `editor@naeeparvaz.com` through Resend. Challenges are hashed, limited to five attempts, expire after ten minutes and are rate-limited per DigitalOcean client IP. Successful sign-in creates a random, hashed PostgreSQL session lasting eight hours. The browser receives only an HttpOnly, Secure, SameSite=Strict cookie.
 
-PostgreSQL stores settings, social links, article/video metadata, labels, relationships, advertisement schedules, aggregate visit counts, temporary login challenges and sessions. It does not store media files, raw visitor IP addresses or individual visitor profiles. Video files remain on the social platforms, public editorial images remain in Google Drive, and contact messages are sent directly through Resend rather than stored.
+PostgreSQL stores settings, social links, article/video metadata, labels, relationships, advertisement schedules, aggregate visit counts, temporary login challenges, sessions and Social Publisher job metadata. It does not store media files, raw visitor IP addresses or individual visitor profiles. Public editorial images remain in Google Drive. Social Publisher uploads remain temporarily in private R2 and are removed by lifecycle rules after publication retention. Contact messages are sent directly through Resend rather than stored.
 
 Database schema changes live in `db/migrations/`. `npm start` applies pending migrations before starting the production server. Run them locally with:
 
@@ -87,6 +88,8 @@ npm run db:migrate
 The second migration preserves the two published videos and verified social URLs already entered in the former local D1 editor. The third migration adds publishing data without deleting those records and maps older video categories into the fixed label taxonomy. The ignored `.wrangler` state is not deleted.
 
 See [Publishing and advertising guide](docs/publishing-and-advertising.md) for editor workflows, safe Markdown, Google Drive sharing, label behavior, advertising schedules and the visit metric.
+
+See [Social video publisher setup](docs/social-video-publisher.md) for R2, the signed media Worker, Buffer channels, lifecycle rules, CORS, DigitalOcean variables and a production acceptance checklist.
 
 ## DigitalOcean deployment
 
@@ -112,6 +115,10 @@ The main production values are:
 | `TURNSTILE_SITE_KEY` | General runtime value | Public contact/login widget key. |
 | `TURNSTILE_SECRET_KEY` | Encrypted runtime secret | Server-side Turnstile verification key. |
 | `LOCAL_ADMIN_CODE` | Local `.env` only | Local browser sign-in code; never configure in production. |
+| `BUFFER_API_KEY` | Encrypted runtime secret | Discovers channels and creates/reconciles posts through Buffer. |
+| `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` | Encrypted runtime secrets | Permit only the website backend to manage publisher objects. |
+| `MEDIA_URL_SIGNING_SECRET` | Encrypted runtime secret | Shared HMAC key used by the website and media Worker. |
+| `R2_ACCOUNT_ID`, `R2_BUCKET`, `R2_ENDPOINT`, `R2_MEDIA_BASE_URL` | General runtime values | Identify private R2 storage and the stable Worker media origin. |
 
 No real credential belongs in this repository. DigitalOcean supplies `DATABASE_URL` from the PostgreSQL component, and encrypted variables are entered only in the App Platform dashboard.
 

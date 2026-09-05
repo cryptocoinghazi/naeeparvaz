@@ -1,0 +1,285 @@
+---
+import AdminHeader from "../../../components/AdminHeader.astro";
+import { bufferConfigured } from "../../../lib/buffer-client";
+import { publisherStorageConfigured } from "../../../lib/publisher-r2";
+import { getPublishBatches, getPublisherChannels } from "../../../lib/publisher-repository";
+import { socialPlatforms, type PublishTargetStatus, type SocialPlatform } from "../../../types/publisher";
+import "../../../styles/global.css";
+import "../../../styles/admin.css";
+
+const [channels, batches] = await Promise.all([
+  getPublisherChannels(Astro.locals),
+  getPublishBatches(Astro.locals),
+]);
+const saved = Astro.url.searchParams.get("saved");
+const error = Astro.url.searchParams.get("error");
+const bufferReady = bufferConfigured(Astro.locals);
+const storageReady = publisherStorageConfigured(Astro.locals);
+const platformNames: Record<SocialPlatform, string> = { instagram: "Instagram", facebook: "Facebook", youtube: "YouTube" };
+const statusNames: Record<PublishTargetStatus, string> = {
+  pending: "Pending", submitting: "Submitting", scheduled: "Scheduled", published: "Published",
+  failed: "Failed", cancelled: "Cancelled", ambiguous: "Needs review",
+};
+const formatDate = (value?: string) => value ? new Intl.DateTimeFormat("en-IN", {
+  dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kolkata",
+}).format(new Date(value)) : "—";
+const usableChannel = (platform: SocialPlatform) => channels.find((channel) => channel.platform === platform && channel.enabled && !channel.disconnected && !channel.locked);
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="theme-color" content="#082f78" />
+    <title>Social publisher | Naee Parvaz News</title>
+  </head>
+  <body class="admin-body">
+    <a class="skip-link" href="#admin-content">Skip to publisher</a>
+    <AdminHeader kicker="Protected publishing desk" title="Social video publisher" description="Upload one verified short video, review the copy, then publish now or schedule through Buffer." />
+
+    <main id="admin-content" class="admin-container admin-main">
+      {saved && <p class="admin-notice admin-notice-success" role="status">Publisher action completed. Review each platform status below.</p>}
+      {error && <p class="admin-notice admin-notice-error" role="alert">The publisher action could not be completed. Review the setup and target status before trying again.</p>}
+
+      <section class="admin-section" aria-labelledby="publisher-setup-heading">
+        <div class="admin-section-heading">
+          <div><p class="kicker">Provider setup</p><h2 id="publisher-setup-heading">Buffer channels and R2</h2></div>
+          <p>Exactly one official Naee Parvaz channel may be selected for each platform. Credentials remain server-only.</p>
+        </div>
+        <div class="publisher-readiness" aria-label="Publisher configuration status">
+          <p><span class:list={["publisher-dot", bufferReady && "is-ready"]}></span> Buffer API {bufferReady ? "configured" : "not configured"}</p>
+          <p><span class:list={["publisher-dot", storageReady && "is-ready"]}></span> R2 storage and media URL {storageReady ? "configured" : "not configured"}</p>
+        </div>
+        <div class="publisher-channel-summary">
+          {socialPlatforms.map((platform) => {
+            const channel = usableChannel(platform);
+            return <article><strong>{platformNames[platform]}</strong><span>{channel?.displayName ?? "Not selected"}</span></article>;
+          })}
+        </div>
+        <div class="admin-actions">
+          <button class="button button-outline" id="discover-channels" type="button" disabled={!bufferReady}>Discover Buffer channels</button>
+        </div>
+        <form class="admin-form publisher-channel-form" id="channel-form" hidden>
+          <div class="admin-form-grid">
+            {socialPlatforms.map((platform) => <label>{platformNames[platform]} channel<select name={platform}><option value="">Do not use</option></select></label>)}
+          </div>
+          <p id="channel-message" class="admin-help" aria-live="polite"></p>
+          <button class="button" type="submit">Save official channels</button>
+        </form>
+      </section>
+
+      <section class="admin-section" aria-labelledby="new-publish-heading">
+        <div class="admin-section-heading">
+          <div><p class="kicker">New publishing batch</p><h2 id="new-publish-heading">Upload and prepare</h2></div>
+          <p>Accepted: MP4, H.264 + AAC, vertical 9:16, up to 1080 × 1920, 5–90 seconds and no more than 90 MB.</p>
+        </div>
+        {(!bufferReady || !storageReady || !channels.length) && <p class="admin-notice admin-notice-error">Complete the provider configuration and select at least one usable channel before publishing.</p>}
+        <div class="publisher-upload-box">
+          <label for="publisher-file"><strong>One MP4 video</strong><input id="publisher-file" type="file" accept="video/mp4,.mp4" /></label>
+          <button class="button" id="upload-video" type="button" disabled={!storageReady}>Upload and validate video</button>
+          <progress id="upload-progress" max="100" value="0" hidden>0%</progress>
+          <p id="upload-message" class="admin-help" aria-live="polite">The video is uploaded directly from this browser to private R2 storage.</p>
+        </div>
+
+        <form class="admin-form" id="publisher-form" method="post" action="/api/editor/publisher/publish/">
+          <input id="publisher-asset-id" type="hidden" name="assetId" />
+          <input type="hidden" name="clientRequestId" value={crypto.randomUUID()} />
+          <fieldset class="admin-label-fieldset admin-span-2">
+            <legend>Publish to <small>(choose one or more connected platforms)</small></legend>
+            <div class="admin-label-options">
+              {socialPlatforms.map((platform) => {
+                const channel = usableChannel(platform);
+                return <label class="admin-label-chip"><input type="checkbox" name="platforms" value={platform} checked={Boolean(channel)} disabled={!channel} /><span>{platformNames[platform]}<small>{channel?.displayName ?? "Not connected"}</small></span></label>;
+              })}
+            </div>
+          </fieldset>
+          <div class="admin-form-grid">
+            <label class="admin-span-2">Shared post text<textarea name="sharedText" required maxlength="2200" rows="5" placeholder="Common caption used unless a platform-specific version is supplied."></textarea></label>
+            <label>Instagram caption (optional override)<textarea name="instagramCaption" maxlength="2200" rows="5"></textarea></label>
+            <label>Facebook caption (optional override)<textarea name="facebookCaption" maxlength="2200" rows="5"></textarea></label>
+            <label>YouTube title<input name="youtubeTitle" maxlength="100" /></label>
+            <label>YouTube description<textarea name="youtubeDescription" maxlength="5000" rows="5"></textarea></label>
+          </div>
+          <fieldset class="publisher-mode">
+            <legend>Timing</legend>
+            <label><input type="radio" name="publishMode" value="now" checked /> Publish now</label>
+            <label><input type="radio" name="publishMode" value="scheduled" /> Schedule in Asia/Kolkata</label>
+            <label id="schedule-field" hidden>Scheduled date and time<input type="datetime-local" name="scheduledFor" /></label>
+          </fieldset>
+          <p class="admin-help">Submission is never retried automatically when Buffer's response is uncertain, preventing accidental duplicate posts.</p>
+          <button class="button" id="review-publish" type="button" disabled>Review publishing batch</button>
+        </form>
+      </section>
+
+      <dialog class="publisher-review" id="publisher-review" aria-labelledby="publisher-review-title">
+        <form method="dialog"><button class="publisher-dialog-close" aria-label="Close review">×</button></form>
+        <p class="kicker">Final confirmation</p><h2 id="publisher-review-title">Review before sending</h2>
+        <video id="publisher-review-video" controls muted playsinline></video>
+        <div id="publisher-review-content"></div>
+        <div class="admin-actions"><button class="button" id="confirm-publish" type="button">Confirm and send to Buffer</button><form method="dialog"><button class="button button-outline">Go back</button></form></div>
+      </dialog>
+
+      <section class="admin-section" aria-labelledby="publish-history-heading">
+        <div class="admin-section-heading">
+          <div><p class="kicker">Publishing history</p><h2 id="publish-history-heading">Batches and target status</h2></div>
+          <p>Refresh reconciles known Buffer post IDs. Retry is available only after Buffer confirms a target failed.</p>
+        </div>
+        {batches.length ? <div class="publisher-batch-list">{batches.map((batch) => (
+          <article class="publisher-batch" id={`batch-${batch.id}`}>
+            <header><div><span class={`admin-status publisher-state-${batch.state}`}>{batch.state}</span><h3>{batch.youtubeTitle || batch.sharedText.slice(0, 90)}</h3></div><form method="post" action="/api/editor/publisher/target/"><input type="hidden" name="batchId" value={batch.id} /><input type="hidden" name="action" value="refresh" /><button class="button button-outline">Refresh status</button></form></header>
+            <dl class="publisher-metadata"><div><dt>Video</dt><dd>{batch.asset.originalFilename}</dd></div><div><dt>Timing</dt><dd>{batch.publishMode === "scheduled" ? formatDate(batch.scheduledFor) : "Publish now"}</dd></div><div><dt>Created</dt><dd>{formatDate(batch.createdAt)}</dd></div></dl>
+            {(["failed", "cancelled"].includes(batch.state) && batch.asset.status === "validated") && <form class="publisher-discard-form" method="post" action="/api/editor/publisher/target/"><input type="hidden" name="batchId" value={batch.id} /><input type="hidden" name="action" value="discard" /><button class="button button-outline">Discard failed/cancelled video</button></form>}
+            <div class="publisher-target-list">{batch.targets.map((target) => (
+              <section class="publisher-target">
+                <div><strong>{platformNames[target.platform]}</strong><span class={`admin-status publisher-target-${target.status}`}>{statusNames[target.status]}</span></div>
+                {target.publishedUrl && <a href={target.publishedUrl} target="_blank" rel="noopener">Open published post ↗</a>}
+                {target.errorMessage && <p class="publisher-error"><strong>{target.errorCode}</strong> {target.errorMessage}</p>}
+                <div class="admin-actions">
+                  {target.status === "scheduled" && <form method="post" action="/api/editor/publisher/target/"><input type="hidden" name="batchId" value={batch.id} /><input type="hidden" name="platform" value={target.platform} /><input type="hidden" name="action" value="cancel" /><button class="button button-outline">Cancel scheduled post</button></form>}
+                  {target.status === "failed" && <form method="post" action="/api/editor/publisher/target/"><input type="hidden" name="batchId" value={batch.id} /><input type="hidden" name="platform" value={target.platform} /><input type="hidden" name="action" value="retry" /><button class="button button-outline">Retry confirmed failure</button></form>}
+                </div>
+                {target.status === "published" && target.publishedUrl && <form class="publisher-import" method="get" action="/editor/#new-video"><input type="hidden" name="publisherBatch" value={batch.id} /><input type="hidden" name="publisherPlatform" value={target.platform} /><button class="button button-outline">Add to website video library</button><p class="admin-help">Opens the existing form with this platform URL and available copy prefilled. No record is created automatically.</p></form>}
+              </section>
+            ))}</div>
+          </article>
+        ))}</div> : <p class="admin-empty">No social publishing batches yet.</p>}
+      </section>
+    </main>
+
+    <script>
+      const platformNames: Record<string, string> = { instagram: "Instagram", facebook: "Facebook", youtube: "YouTube" };
+      interface BrowserChannel { id: string; platform?: string; channelId?: string; displayName: string; service: string; disconnected: boolean; locked: boolean }
+      interface ChannelPayload { error?: string; channels: BrowserChannel[]; selected: BrowserChannel[] }
+      interface UploadPayload { error?: string; assetId?: string; uploadUrl?: string; asset?: { id: string; width: number; height: number; durationSeconds: number } }
+      const discoverButton = document.querySelector("#discover-channels");
+      const channelForm = document.querySelector("#channel-form");
+      const channelMessage = document.querySelector("#channel-message");
+      discoverButton?.addEventListener("click", async () => {
+        discoverButton.setAttribute("disabled", "");
+        if (channelMessage) channelMessage.textContent = "Loading channels from Buffer…";
+        try {
+          const response = await fetch("/api/editor/publisher/channels/");
+          const payload = await response.json() as ChannelPayload;
+          if (!response.ok) throw new Error(payload.error || "Buffer channel discovery failed.");
+          const selected = new Map(payload.selected.map((item: BrowserChannel) => [item.platform, item.channelId]));
+          for (const platform of Object.keys(platformNames)) {
+            const select = channelForm?.querySelector(`[name="${platform}"]`);
+            if (!(select instanceof HTMLSelectElement)) continue;
+            select.replaceChildren(new Option("Do not use", ""));
+            const candidates = payload.channels.filter((item: BrowserChannel) => item.service.toLowerCase().includes(platform));
+            for (const channel of candidates) {
+              const state = channel.disconnected || channel.locked ? " (unavailable)" : "";
+              const option = new Option(`${channel.displayName}${state}`, channel.id, false, selected.get(platform) === channel.id);
+              option.disabled = channel.disconnected || channel.locked;
+              select.add(option);
+            }
+          }
+          if (channelForm instanceof HTMLFormElement) channelForm.hidden = false;
+          if (channelMessage) channelMessage.textContent = "Select the exact official Naee Parvaz channels, then save.";
+        } catch (error) {
+          if (channelMessage) channelMessage.textContent = error instanceof Error ? error.message : "Channel discovery failed.";
+        } finally { discoverButton.removeAttribute("disabled"); }
+      });
+      channelForm?.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        if (!(channelForm instanceof HTMLFormElement)) return;
+        const data = new FormData(channelForm);
+        if (channelMessage) channelMessage.textContent = "Saving channel selections…";
+        const response = await fetch("/api/editor/publisher/channels/", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(Object.fromEntries(data)) });
+        const payload = await response.json();
+        if (!response.ok) { if (channelMessage) channelMessage.textContent = payload.error || "Channel selection failed."; return; }
+        location.reload();
+      });
+
+      const fileInput = document.querySelector("#publisher-file");
+      const uploadButton = document.querySelector("#upload-video");
+      const uploadProgress = document.querySelector("#upload-progress");
+      const uploadMessage = document.querySelector("#upload-message");
+      const assetInput = document.querySelector("#publisher-asset-id");
+      const reviewButton = document.querySelector("#review-publish");
+      const publisherForm = document.querySelector("#publisher-form");
+      const requestJson = async (body: Record<string, unknown>): Promise<UploadPayload> => {
+        const response = await fetch("/api/editor/publisher/upload/", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+        const payload = await response.json() as UploadPayload;
+        if (!response.ok) throw new Error(payload.error || "Upload request failed.");
+        return payload;
+      };
+      const uploadToR2 = (url: string, file: File) => new Promise<void>((resolve, reject) => {
+        const request = new XMLHttpRequest();
+        request.open("PUT", url);
+        request.setRequestHeader("Content-Type", "video/mp4");
+        request.upload.addEventListener("progress", (event) => {
+          if (event.lengthComputable && uploadProgress instanceof HTMLProgressElement) uploadProgress.value = Math.round(event.loaded / event.total * 100);
+        });
+        request.addEventListener("load", () => request.status >= 200 && request.status < 300 ? resolve(undefined) : reject(new Error("R2 rejected the upload.")));
+        request.addEventListener("error", () => reject(new Error("The direct R2 upload was interrupted.")));
+        request.send(file);
+      });
+      uploadButton?.addEventListener("click", async () => {
+        const file = fileInput instanceof HTMLInputElement ? fileInput.files?.[0] : undefined;
+        if (!file) { if (uploadMessage) uploadMessage.textContent = "Choose an MP4 video first."; return; }
+        if (file.type !== "video/mp4" || !file.name.toLowerCase().endsWith(".mp4") || file.size > 90 * 1024 * 1024) { if (uploadMessage) uploadMessage.textContent = "Choose an MP4 file no larger than 90 MB."; return; }
+        uploadButton.setAttribute("disabled", "");
+        if (uploadProgress instanceof HTMLProgressElement) { uploadProgress.hidden = false; uploadProgress.value = 0; }
+        let assetId;
+        try {
+          if (uploadMessage) uploadMessage.textContent = "Creating a secure direct-upload URL…";
+          const created = await requestJson({ action: "create", filename: file.name, mimeType: file.type, byteSize: file.size });
+          if (!created.assetId || !created.uploadUrl) throw new Error("The server returned an incomplete upload request.");
+          assetId = created.assetId;
+          if (uploadMessage) uploadMessage.textContent = "Uploading directly to private R2 storage…";
+          await uploadToR2(created.uploadUrl, file);
+          if (uploadMessage) uploadMessage.textContent = "Checking codec, audio, dimensions and duration…";
+          const completed = await requestJson({ action: "complete", assetId });
+          if (!completed.asset) throw new Error("The server returned incomplete validation details.");
+          if (assetInput instanceof HTMLInputElement) assetInput.value = completed.asset.id;
+          if (reviewButton instanceof HTMLButtonElement) reviewButton.disabled = false;
+          if (uploadMessage) uploadMessage.textContent = `Validated: ${completed.asset.width} × ${completed.asset.height}, ${Math.round(completed.asset.durationSeconds)} seconds.`;
+        } catch (error) {
+          if (assetId) requestJson({ action: "discard", assetId }).catch(() => undefined);
+          if (uploadMessage) uploadMessage.textContent = error instanceof Error ? error.message : "Upload validation failed.";
+        } finally { uploadButton.removeAttribute("disabled"); }
+      });
+
+      const scheduleField = document.querySelector("#schedule-field");
+      for (const radio of document.querySelectorAll('[name="publishMode"]')) radio.addEventListener("change", () => {
+        const scheduled = publisherForm?.querySelector('[name="publishMode"]:checked')?.getAttribute("value") === "scheduled";
+        if (scheduleField instanceof HTMLElement) scheduleField.hidden = !scheduled;
+        const input = scheduleField?.querySelector("input");
+        if (input instanceof HTMLInputElement) input.required = scheduled;
+      });
+      const reviewDialog = document.querySelector("#publisher-review");
+      const reviewContent = document.querySelector("#publisher-review-content");
+      const reviewVideo = document.querySelector("#publisher-review-video");
+      let reviewVideoUrl = "";
+      reviewButton?.addEventListener("click", () => {
+        if (!(publisherForm instanceof HTMLFormElement) || !publisherForm.reportValidity()) return;
+        const data = new FormData(publisherForm);
+        const targetValues = data.getAll("platforms").filter((item): item is string => typeof item === "string");
+        const targets = targetValues.map((item) => platformNames[item] || item).join(", ");
+        if (!targets) { alert("Select at least one connected platform."); return; }
+        if (targetValues.includes("youtube") && !String(data.get("youtubeTitle") || "").trim()) { alert("Enter a YouTube title."); return; }
+        if (targetValues.includes("youtube") && !String(data.get("youtubeDescription") || "").trim()) { alert("Enter a YouTube description."); return; }
+        if (reviewVideoUrl) URL.revokeObjectURL(reviewVideoUrl);
+        const file = fileInput instanceof HTMLInputElement ? fileInput.files?.[0] : undefined;
+        if (file && reviewVideo instanceof HTMLVideoElement) { reviewVideoUrl = URL.createObjectURL(file); reviewVideo.src = reviewVideoUrl; }
+        if (reviewContent) reviewContent.innerHTML = `<dl><div><dt>Platforms</dt><dd>${targets}</dd></div><div><dt>Timing</dt><dd>${data.get("publishMode") === "scheduled" ? `${data.get("scheduledFor")} (Asia/Kolkata)` : "Publish now"}</dd></div><div><dt>Video</dt><dd>${fileInput instanceof HTMLInputElement ? fileInput.files?.[0]?.name || "Validated upload" : "Validated upload"}</dd></div></dl><p><strong>Shared text</strong></p><p class="publisher-review-copy"></p>`;
+        const copy = reviewContent?.querySelector(".publisher-review-copy");
+        if (copy) copy.textContent = String(data.get("sharedText") || "");
+        if (reviewDialog instanceof HTMLDialogElement) reviewDialog.showModal();
+      });
+      document.querySelector("#confirm-publish")?.addEventListener("click", () => {
+        if (!(publisherForm instanceof HTMLFormElement)) return;
+        const button = document.querySelector("#confirm-publish");
+        button?.setAttribute("disabled", "");
+        publisherForm.submit();
+      });
+      reviewDialog?.addEventListener("close", () => {
+        if (reviewVideo instanceof HTMLVideoElement) reviewVideo.removeAttribute("src");
+        if (reviewVideoUrl) { URL.revokeObjectURL(reviewVideoUrl); reviewVideoUrl = ""; }
+      });
+    </script>
+  </body>
+</html>

@@ -1,9 +1,11 @@
 ---
 import AdminLabelFields from "../../components/AdminLabelFields.astro";
 import { getContentLabels } from "../../lib/label-repository";
+import { getPublishBatch } from "../../lib/publisher-repository";
 import { getSiteSettings, getSocialLinks, socialPlatformLabels } from "../../lib/site-repository";
 import { getAdminVideos } from "../../lib/video-repository";
 import { providerLabels } from "../../lib/video";
+import { socialPlatforms, type SocialPlatform } from "../../types/publisher";
 import "../../styles/global.css";
 import "../../styles/admin.css";
 
@@ -13,6 +15,16 @@ const videos = await getAdminVideos(Astro.locals);
 const labels = await getContentLabels(Astro.locals);
 const saved = Astro.url.searchParams.get("saved");
 const error = Astro.url.searchParams.get("error");
+const publisherBatchId = Astro.url.searchParams.get("publisherBatch");
+const publisherPlatformValue = Astro.url.searchParams.get("publisherPlatform");
+const publisherBatch = publisherBatchId && /^[0-9a-f-]{36}$/i.test(publisherBatchId) ? await getPublishBatch(Astro.locals, publisherBatchId) : undefined;
+const publisherPlatform = socialPlatforms.includes(publisherPlatformValue as SocialPlatform) ? publisherPlatformValue as SocialPlatform : undefined;
+const publisherTarget = publisherBatch?.targets.find((target) => target.platform === publisherPlatform && target.status === "published" && target.publishedUrl);
+const publisherPrefill = publisherBatch && publisherTarget ? {
+  sourceUrl: publisherTarget.publishedUrl ?? "",
+  titleEn: publisherBatch.youtubeTitle ?? "",
+  descriptionEn: publisherTarget.platform === "youtube" ? publisherBatch.youtubeDescription || publisherBatch.sharedText : publisherBatch.sharedText,
+} : undefined;
 const today = new Intl.DateTimeFormat("en-CA", {
   timeZone: "Asia/Kolkata",
   year: "numeric",
@@ -44,6 +56,7 @@ const today = new Intl.DateTimeFormat("en-CA", {
           <a class="button button-outline admin-button-outline" href="/editor/articles/">Articles</a>
           <a class="button button-outline admin-button-outline" href="/editor/ads/">Advertisements</a>
           <a class="button button-outline admin-button-outline" href="/editor/analytics/">Analytics</a>
+          <a class="button button-outline admin-button-outline" href="/editor/publisher/">Social publisher</a>
           <a class="button button-outline admin-button-outline" href="#new-video">Add video</a>
           <form class="admin-logout-form" method="post" action="/api/auth/logout/">
             <button class="button button-outline admin-button-outline" type="submit">Sign out</button>
@@ -55,6 +68,7 @@ const today = new Intl.DateTimeFormat("en-CA", {
     <main id="admin-content" class="admin-container admin-main">
       {saved && <p class="admin-notice admin-notice-success" role="status">Changes saved successfully.</p>}
       {error && <p class="admin-notice admin-notice-error" role="alert">The update could not be saved. Check every field and confirm PostgreSQL is available.</p>}
+      {publisherPrefill && <p class="admin-notice admin-notice-success" role="status">The published social link and available copy are prefilled below. Add bilingual editorial details, review the labels, then save one website-library draft.</p>}
 
       <section class="admin-section" aria-labelledby="contact-settings-heading">
         <div class="admin-section-heading">
@@ -108,13 +122,13 @@ const today = new Intl.DateTimeFormat("en-CA", {
         </div>
         <form class="admin-form" method="post" action="/api/editor/videos/">
           <div class="admin-form-grid">
-            <label class="admin-span-2">Public video URL<input name="sourceUrl" required type="url" inputmode="url" maxlength="1000" placeholder="https://www.youtube.com/watch?v=…" /></label>
+            <label class="admin-span-2">Public video URL<input name="sourceUrl" required type="url" inputmode="url" maxlength="1000" value={publisherPrefill?.sourceUrl ?? ""} placeholder="https://www.youtube.com/watch?v=…" /></label>
             <label>Published date<input name="publishedAt" required type="date" value={today} /></label>
             <label class="admin-span-2">Google Drive thumbnail (optional)<input name="thumbnailUrl" type="url" inputmode="url" maxlength="1000" placeholder="https://drive.google.com/file/d/…/view" /></label>
             <AdminLabelFields labels={labels} selected={["other"]} />
-            <label>English title<input name="titleEn" maxlength="240" /></label>
+            <label>English title<input name="titleEn" maxlength="240" value={publisherPrefill?.titleEn ?? ""} /></label>
             <label lang="hi">हिंदी शीर्षक<input name="titleHi" maxlength="240" lang="hi" /></label>
-            <label>English description<textarea name="descriptionEn" maxlength="1200" rows="4"></textarea></label>
+            <label>English description<textarea name="descriptionEn" maxlength="1200" rows="4">{publisherPrefill?.descriptionEn ?? ""}</textarea></label>
             <label lang="hi">हिंदी विवरण<textarea name="descriptionHi" maxlength="1200" rows="4" lang="hi"></textarea></label>
             <label>Status<select name="status"><option value="draft">Draft</option><option value="published">Published</option></select></label>
             <label class="admin-check admin-check-bottom"><input name="featured" type="checkbox" /> Feature this video</label>
