@@ -3,6 +3,8 @@ import { getRuntimeEnv } from "./runtime";
 
 const endpoint = "https://api.buffer.com";
 const maxResponseBytes = 1024 * 1024;
+const requestTimeoutMs = 20_000;
+const submissionTimeoutMs = 120_000;
 
 const organizationsQuery = `
   query NaeeParvazOrganizations {
@@ -87,7 +89,7 @@ async function execute(locals: App.Locals, operationName: string, query: string,
       method: "POST",
       headers: { Authorization: `Bearer ${key(locals)}`, "Content-Type": "application/json" },
       body: JSON.stringify({ operationName, query, variables }),
-      signal: AbortSignal.timeout(20_000),
+      signal: AbortSignal.timeout(submission ? submissionTimeoutMs : requestTimeoutMs),
     });
   } catch {
     throw new BufferError("BUFFER_NETWORK_ERROR", submission ? "Buffer submission outcome is unknown." : "Buffer could not be reached.", submission);
