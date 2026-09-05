@@ -64,7 +64,7 @@ function config(locals?: App.Locals): R2Config {
   return {
     bucket: required(env.R2_BUCKET, "R2_BUCKET"),
     mediaBaseUrl: required(env.R2_MEDIA_BASE_URL, "R2_MEDIA_BASE_URL").replace(/\/+$/, ""),
-    signingSecret: required(env.MEDIA_URL_SIGNING_SECRET, "MEDIA_URL_SIGNING_SECRET"),
+    signingSecret: required(env.MEDIA_URL_SIGNING_SECRET_NEXT || env.MEDIA_URL_SIGNING_SECRET, "MEDIA_URL_SIGNING_SECRET"),
     client: new S3Client({
       region: "auto",
       endpoint,

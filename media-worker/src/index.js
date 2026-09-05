@@ -39,10 +39,11 @@ export default {
       return new Response("Method not allowed", { status: 405, headers: { Allow: "GET, HEAD", "Cache-Control": "no-store" } });
     }
     const match = new URL(request.url).pathname.match(mediaPath);
-    if (!match || !env.MEDIA_URL_SIGNING_SECRET) return notFound();
+    if (!match || (!env.MEDIA_URL_SIGNING_SECRET_NEXT && !env.MEDIA_URL_SIGNING_SECRET)) return notFound();
     const [, suppliedSignature, key] = match;
-    const signature = await expectedSignature(key, env.MEDIA_URL_SIGNING_SECRET);
-    if (!constantTimeEqual(suppliedSignature, signature)) return notFound();
+    const signingSecrets = [env.MEDIA_URL_SIGNING_SECRET_NEXT, env.MEDIA_URL_SIGNING_SECRET].filter(Boolean);
+    const signatures = await Promise.all(signingSecrets.map((secret) => expectedSignature(key, secret)));
+    if (!signatures.some((signature) => constantTimeEqual(suppliedSignature, signature))) return notFound();
 
     if (request.method === "HEAD") {
       const object = await env.VIDEO_BUCKET.head(key);

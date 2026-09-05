@@ -51,3 +51,13 @@ test("Worker streams signed HEAD, GET and byte ranges and rejects unsafe access"
   assert.equal((await worker.fetch(new Request(url, { method: "POST" }), env)).status, 405);
   assert.equal((await worker.fetch(new Request(`https://media.example/media/${signature}/retention/file.mp4`), env)).status, 404);
 });
+
+test("Worker accepts the next signing secret during a safe rotation", async () => {
+  const nextSecret = "focused-worker-next-secret";
+  const signature = await expectedSignature(key, nextSecret);
+  const response = await worker.fetch(new Request(`https://media.example/media/${signature}/${key}`, { method: "HEAD" }), {
+    ...env,
+    MEDIA_URL_SIGNING_SECRET_NEXT: nextSecret,
+  });
+  assert.equal(response.status, 200);
+});

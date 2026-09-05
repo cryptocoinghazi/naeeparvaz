@@ -8,6 +8,7 @@ export function getRuntimeEnv(_locals?: App.Locals): RuntimeEnv {
     RESEND_API_KEY: process.env.RESEND_API_KEY,
     BUFFER_API_KEY: process.env.BUFFER_API_KEY,
     MEDIA_URL_SIGNING_SECRET: process.env.MEDIA_URL_SIGNING_SECRET,
+    MEDIA_URL_SIGNING_SECRET_NEXT: process.env.MEDIA_URL_SIGNING_SECRET_NEXT,
     R2_ACCESS_KEY_ID: process.env.R2_ACCESS_KEY_ID,
     R2_ACCOUNT_ID: process.env.R2_ACCOUNT_ID,
     R2_BUCKET: process.env.R2_BUCKET,

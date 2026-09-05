@@ -8,6 +8,7 @@ interface RuntimeEnv {
   RESEND_API_KEY?: string;
   BUFFER_API_KEY?: string;
   MEDIA_URL_SIGNING_SECRET?: string;
+  MEDIA_URL_SIGNING_SECRET_NEXT?: string;
   R2_ACCESS_KEY_ID?: string;
   R2_ACCOUNT_ID?: string;
   R2_BUCKET?: string;

@@ -23,6 +23,7 @@ const statusNames: Record<PublishTargetStatus, string> = {
 const formatDate = (value?: string) => value ? new Intl.DateTimeFormat("en-IN", {
   dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kolkata",
 }).format(new Date(value)) : "—";
+const displayTargetError = (message?: string) => message?.replace(/\bBuffer\b/gi, "Publishing service");
 const usableChannel = (platform: SocialPlatform) => channels.find((channel) => channel.platform === platform && channel.enabled && !channel.disconnected && !channel.locked);
 ---
 
@@ -135,7 +136,7 @@ const usableChannel = (platform: SocialPlatform) => channels.find((channel) => c
               <section class="publisher-target">
                 <div><strong>{platformNames[target.platform]}</strong><span class={`admin-status publisher-target-${target.status}`}>{statusNames[target.status]}</span></div>
                 {target.publishedUrl && <a href={target.publishedUrl} target="_blank" rel="noopener">Open published post ↗</a>}
-                {target.errorMessage && <p class="publisher-error"><strong>{target.errorCode}</strong> {target.errorMessage}</p>}
+                {target.errorMessage && <p class="publisher-error">{displayTargetError(target.errorMessage)}</p>}
                 <div class="admin-actions">
                   {target.status === "scheduled" && <form method="post" action="/api/editor/publisher/target/"><input type="hidden" name="batchId" value={batch.id} /><input type="hidden" name="platform" value={target.platform} /><input type="hidden" name="action" value="cancel" /><button class="button button-outline">Cancel scheduled post</button></form>}
                   {target.status === "failed" && <form method="post" action="/api/editor/publisher/target/"><input type="hidden" name="batchId" value={batch.id} /><input type="hidden" name="platform" value={target.platform} /><input type="hidden" name="action" value="retry" /><button class="button button-outline">Retry confirmed failure</button></form>}
