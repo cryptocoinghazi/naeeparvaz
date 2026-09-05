@@ -8,7 +8,7 @@ import {
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { createHmac } from "node:crypto";
-import { createFile, type Movie } from "mp4box/simple";
+import { createFile, type Movie } from "mp4box";
 import { getRuntimeEnv } from "./runtime";
 
 export const maxPublisherVideoBytes = 90 * 1024 * 1024;
@@ -37,16 +37,17 @@ export function validatePublisherMovie(movie: Movie, byteSize: number): Validate
   if (!video || !audio || movie.videoTracks.length !== 1 || movie.audioTracks.length !== 1) {
     throw new Error("The MP4 must contain one video track and one audio track.");
   }
-  const durationSeconds = movie.duration / movie.timescale;
+  const movieDurationSeconds = movie.timescale > 0 ? movie.duration / movie.timescale : 0;
+  const trackDurationSeconds = video.timescale > 0 ? video.samples_duration / video.timescale : 0;
+  const durationSeconds = movieDurationSeconds > 0 ? movieDurationSeconds : trackDurationSeconds;
   const width = Math.round(video.video?.width ?? video.track_width);
   const height = Math.round(video.video?.height ?? video.track_height);
   const videoCodec = video.codec.toLowerCase();
   const audioCodec = audio.codec.toLowerCase();
   if (!videoCodec.startsWith("avc1") && !videoCodec.startsWith("avc3")) throw new Error("The video codec must be H.264.");
   if (!audioCodec.startsWith("mp4a.40")) throw new Error("The audio codec must be AAC.");
-  if (durationSeconds < 5 || durationSeconds > 90) throw new Error("The video duration must be between 5 and 90 seconds.");
-  if (width > 1080 || height > 1920) throw new Error("The video resolution must not exceed 1080 × 1920.");
-  if (Math.abs(width / height - 9 / 16) > 0.015) throw new Error("The video must use a vertical 9:16 aspect ratio.");
+  if (durationSeconds < 3 || durationSeconds > 15 * 60) throw new Error("The video duration must be between 3 seconds and 15 minutes.");
+  if (width < 1 || height < 1) throw new Error("The video dimensions could not be determined.");
   return { byteSize, durationSeconds, width, height, videoCodec, audioCodec };
 }
 

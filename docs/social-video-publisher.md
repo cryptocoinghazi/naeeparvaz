@@ -156,7 +156,7 @@ npm run media:dev
 
 - `/editor/publisher/` and every `/api/editor/publisher/*` route redirect unauthenticated users to editor sign-in.
 - A valid MP4 uploads directly to R2 and moves from `staging/` to `active/` only after server validation.
-- Wrong MIME, over 90 MB, missing AAC, non-H.264, non-9:16, over 1080p, under 5 seconds and over 90 seconds are rejected.
+- Wrong MIME, over 90 MB, missing AAC, non-H.264, under 3 seconds and over 15 minutes are rejected. Portrait, square and landscape videos are accepted by the application; selected social platforms may enforce narrower limits.
 - An expired upload URL, forged asset UUID, mismatched size and completion request from another origin are rejected.
 - The private bucket has no public or `r2.dev` access.
 - Worker `HEAD`, full `GET` and `Range: bytes=0-1023` return correct MP4 headers for a signed active object.

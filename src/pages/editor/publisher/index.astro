@@ -73,7 +73,7 @@ const usableChannel = (platform: SocialPlatform) => channels.find((channel) => c
       <section class="admin-section" aria-labelledby="new-publish-heading">
         <div class="admin-section-heading">
           <div><p class="kicker">New publishing batch</p><h2 id="new-publish-heading">Upload and prepare</h2></div>
-          <p>Accepted: MP4, H.264 + AAC, vertical 9:16, up to 1080 × 1920, 5–90 seconds and no more than 90 MB.</p>
+          <p>Accepted: MP4, H.264 + AAC, portrait, square or landscape, 3 seconds–15 minutes and no more than 90 MB. Each social platform may apply additional limits.</p>
         </div>
         {(!bufferReady || !storageReady || !channels.length) && <p class="admin-notice admin-notice-error">Complete the provider configuration and select at least one usable channel before publishing.</p>}
         <div class="publisher-upload-box">
