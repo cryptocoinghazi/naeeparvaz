@@ -62,6 +62,7 @@ const date = new Intl.DateTimeFormat(locale === "hi" ? "hi-IN" : "en-IN", {
       const frame = button.closest<HTMLElement>("[data-video-frame]");
       const src = button.dataset.embedUrl;
       if (!frame || !src) return;
+      document.dispatchEvent(new Event('np-library-play'));
       const iframe = document.createElement("iframe");
       iframe.src = src;
       iframe.title = button.dataset.videoTitle || "Video player";

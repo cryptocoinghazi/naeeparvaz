@@ -20,6 +20,7 @@ const state = Astro.url.searchParams.get("status");
   </section>
 
   <section class="section" aria-labelledby="editor-contact-heading">
+    <div class="container" style="margin-bottom:2rem"><a class="button" href={`/${locale}/join/`}>{locale === 'hi' ? 'रिपोर्टर बनें — आवेदन करें' : 'Join as a reporter — Apply'}</a></div>
     <div class="container contact-layout">
       <aside class="editor-contact-card">
         <div class="editor-contact-heading"><p>{copy.contact.editor}</p><h2 id="editor-contact-heading">{settings.editorName}</h2><span lang={locale}>{locale === "hi" ? settings.editorTitleHi : settings.editorTitleEn}</span></div>

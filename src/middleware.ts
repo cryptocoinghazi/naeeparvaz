@@ -71,13 +71,14 @@ export const onRequest = defineMiddleware(async (context, next) => {
     }
   }
 
-  const sensitiveRoute = editorPath || matchesPrefix(pathname, "/api/auth");
+  const sensitiveRoute = editorPath || matchesPrefix(pathname, "/api/auth") || matchesPrefix(pathname, '/api/reporters') || /\/(en|hi)\/join\/?$/.test(pathname);
   if (sensitiveRoute) {
     response.headers.set("Cache-Control", "no-store");
     response.headers.set("X-Robots-Tag", "noindex, nofollow");
     response.headers.set("X-Frame-Options", "DENY");
   }
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  if (matchesPrefix(pathname, '/api/reporters') || /\/(en|hi)\/join\/?$/.test(pathname)) response.headers.set('Referrer-Policy','no-referrer');
   response.headers.set("X-Content-Type-Options", "nosniff");
   if (!import.meta.env.DEV) {
     response.headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");

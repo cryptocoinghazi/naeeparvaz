@@ -1,4 +1,5 @@
 import type { APIRoute } from "astro";
+import { requireSameOrigin } from "../../../lib/editor-api";
 import { saveAdvertisement } from "../../../lib/ad-repository";
 import { validateDriveImageUrl, validateExternalDestination } from "../../../lib/drive-image";
 import { optionalText, requiredText } from "../../../lib/validation";
@@ -18,6 +19,7 @@ function indiaDateTime(value: FormDataEntryValue | null, label: string, required
 export const POST: APIRoute = async ({ request, locals, redirect }) => {
   if (!locals.adminEmail) return new Response("Unauthorized", { status: 401 });
   try {
+    requireSameOrigin(request);
     const form = await request.formData();
     const rawId = String(form.get("id") ?? "");
     const id = /^[0-9a-f-]{36}$/i.test(rawId) ? rawId : undefined;
@@ -27,7 +29,15 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
     const priority = Number(form.get("priority"));
     if (!Number.isInteger(priority) || priority < 0 || priority > 1000) throw new Error("Priority must be between 0 and 1000.");
     const startsAt = indiaDateTime(form.get("startsAt"), "start time", true)!;
-    const endsAt = indiaDateTime(form.get("endsAt"), "end time", false);
+    let endsAt = indiaDateTime(form.get("endsAt"), "end time", false);
+    const expiry = form.get('expiry');
+    if (expiry === 'none') endsAt = undefined;
+    if (expiry === 'duration') {
+      const days = Number(form.get('durationDays'));
+      if (!Number.isInteger(days) || days < 1 || days > 3650) throw new Error('Invalid duration');
+      endsAt = new Date(Date.parse(startsAt) + days * 86400000).toISOString();
+    }
+    if (expiry === 'date' && !endsAt) throw new Error('End date required');
     if (endsAt && new Date(endsAt) <= new Date(startsAt)) throw new Error("The end time must be after the start time.");
     const headlineEn = optionalText(form.get("headlineEn"), "English headline", 180);
     const headlineHi = optionalText(form.get("headlineHi"), "Hindi headline", 180);

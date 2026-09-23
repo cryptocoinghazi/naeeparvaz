@@ -158,6 +158,7 @@ export interface ResolvedArticle extends ArticleRecord, ArticleTranslation {
 export type AdPlacement = "home" | "news-listing" | "video-listing" | "article-end";
 
 export interface Advertisement {
+  deletedAt?: string;
   id: string;
   clientName: string;
   headlineEn?: string;

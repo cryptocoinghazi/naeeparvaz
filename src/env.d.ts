@@ -1,5 +1,10 @@
 /// <reference types="astro/client" />
 interface RuntimeEnv {
+  YOUTUBE_API_KEY?: string;
+  REPORTER_R2_BUCKET?: string;
+  REPORTER_R2_ACCESS_KEY_ID?: string;
+  REPORTER_R2_SECRET_ACCESS_KEY?: string;
+  REPORTER_SITE_ORIGIN?: string;
   ADMIN_EMAIL?: string;
   CONTACT_FROM_EMAIL?: string;
   DATABASE_CA_CERT?: string;

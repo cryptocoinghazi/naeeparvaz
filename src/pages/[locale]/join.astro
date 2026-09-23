@@ -1,0 +1,52 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { isLocale } from '../../data/i18n';
+import { reporterSettings, applicationsConfigured } from '../../lib/reporters';
+import { getRuntimeEnv } from '../../lib/runtime';
+import { indiaToday } from '../../lib/reporter-card';
+const locale=Astro.params.locale; if(!isLocale(locale)) return new Response('Not found',{status:404});
+const hi=locale==='hi';
+const s=await reporterSettings();
+const open=s.enabled && applicationsConfigured(s);
+const fields=[['name','Full name (as on ID)','पूरा नाम (पहचान पत्र के अनुसार)'],['phone','Phone','फोन'],['address','Full address','पूरा पता'],['area','Reporting area / district / state','रिपोर्टिंग क्षेत्र / जिला / राज्य'],['languages','Languages','भाषाएँ'],['education','Education','शिक्षा'],['experience','Reporting experience (write None if new)','रिपोर्टिंग अनुभव (नया होने पर नहीं लिखें)'],['workSamples','Work sample links (optional)','कार्य नमूने के लिंक (वैकल्पिक)']];
+const files=[['photo','Portrait photo','पासपोर्ट फोटो'],['identity','Identity proof','पहचान प्रमाण'],['payment','Payment screenshot','भुगतान स्क्रीनशॉट'],['qualification','Qualification certificate (optional)','योग्यता प्रमाणपत्र (वैकल्पिक)'],['experience','Experience certificate (optional)','अनुभव प्रमाणपत्र (वैकल्पिक)']];
+Astro.response.headers.set('Cache-Control','no-store'); Astro.response.headers.set('Referrer-Policy','no-referrer'); Astro.response.headers.set('X-Robots-Tag','noindex,nofollow');
+---
+<BaseLayout locale={locale} title={hi ? 'रिपोर्टर बनें | नई परवाज़' : 'Join as a reporter | Naee Parvaz'} description={hi ? 'रिपोर्टर आवेदन और संपादकीय समीक्षा' : 'Reporter applications and editorial review'} canonicalPath={`/${locale}/join/`}>
+<section class="page-hero"><div class="container page-hero-inner"><p class="kicker">{hi ? 'नई परवाज़ से जुड़ें' : 'Join Naee Parvaz'}</p><h1>{hi ? 'रिपोर्टर आवेदन' : 'Reporter application'}</h1><p>{hi ? 'आवेदन संपादक की समीक्षा के बाद स्वीकार होगा। भुगतान से स्वीकृति की गारंटी नहीं है।' : 'Applications require editorial approval. Payment does not guarantee acceptance.'}</p></div></section>
+<section class="section"><div class="container reporter-form-wrap">
+{!open ? <p>{hi ? 'आवेदन अभी बंद हैं। जानकारी के लिए हमसे संपर्क करें।' : 'Applications are currently closed. Please contact us for information.'}</p> : <>
+<form data-reporter-begin class="contact-form"><h2>{hi ? 'पहले अपना ईमेल दर्ज करें' : 'Start with your email'}</h2><label>{hi ? 'ईमेल' : 'Email'}<input type="email" name="email" required maxlength="254" autocomplete="email"/></label>
+{getRuntimeEnv().TURNSTILE_SITE_KEY && <div class="cf-turnstile" data-sitekey={getRuntimeEnv().TURNSTILE_SITE_KEY} data-action="reporter"></div>}
+<button class="button" type="submit">{hi ? 'आवेदन शुरू करें' : 'Begin application'}</button></form>
+<p data-reporter-status role="status" aria-live="polite"></p>
+<form data-reporter-form data-locale={locale} class="contact-form" hidden>
+<div class="form-grid">{fields.map(([name,en,hindi]) => <label>{hi ? hindi : en}{['address','experience','workSamples'].includes(name) ? <textarea name={name} required={name!=='workSamples'} rows="3" maxlength={name==='address'?600:2000}></textarea> : <input name={name} required maxlength={name==='name'?100:name==='phone'?30:200}/>}</label>)}</div>
+<label>{hi ? 'पहचान प्रमाण का प्रकार' : 'Identity proof type'}<select name="identityType" required><option value="masked-aadhaar">{hi ? 'मास्क्ड आधार (पहले 8 अंक छिपे हों)' : 'Masked Aadhaar (first 8 digits hidden)'}</option><option value="voter-id">{hi ? 'मतदाता पहचान पत्र' : 'Voter ID'}</option><option value="driving-licence">{hi ? 'ड्राइविंग लाइसेंस' : 'Driving licence'}</option></select></label>
+<p>{hi ? 'आधार अनिवार्य नहीं है। पूरा आधार नंबर या PAN अपलोड न करें।' : 'Aadhaar is optional. Do not upload an unmasked Aadhaar or PAN card.'}</p>
+<section aria-labelledby="payment-title"><h2 id="payment-title">{hi ? 'भुगतान विवरण' : 'Payment details'}</h2><p data-payment-summary></p><img data-payment-qr src="/api/reporters/qr/" width="983" height="1280" alt={hi ? 'भुगतान QR कोड; प्राप्तकर्ता का नाम जाँचें' : 'Payment QR code; verify the recipient name'} class="payment-qr"/><p data-payment-instructions></p><h3>{hi ? 'वापसी नीति' : 'Refund policy'}</h3><p data-payment-refund></p></section>
+<label>{hi ? 'लेनदेन संदर्भ / UTR' : 'Transaction reference / UTR'}<input name="transaction" required minlength="4" maxlength="100"/></label><label>{hi ? 'भुगतान की तारीख' : 'Payment date'}<input name="paymentDate" required type="date" max={indiaToday()}/></label>
+{files.map(([kind,en,hindi]) => <label>{hi ? hindi : en}<input type="file" data-file-kind={kind} accept={kind==='photo'?'image/jpeg,image/png,image/webp':'image/jpeg,image/png,application/pdf'} required={['photo','identity','payment'].includes(kind)}/><small data-existing-kind={kind}></small></label>)}
+<p>{hi ? 'प्रति फ़ाइल अधिकतम 5 MB। दस्तावेज़ निजी हैं और केवल अधिकृत संपादक देख सकते हैं।' : 'Maximum 5 MB per file. Documents are private and accessible only to authorized editors.'}</p>
+<p data-retention></p>
+<label class="check-label"><input type="checkbox" name="consent" value="yes" required/>{hi ? 'मैं आवेदन समीक्षा, पहचान प्रमाण और फोटो के उपयोग तथा बताई गई संग्रह अवधि के लिए सहमत हूँ।' : 'I consent to application review, use of my identity proof/photo and the stated retention periods.'}</label>
+<label class="check-label"><input type="checkbox" name="paymentConsent" value="yes" required/>{hi ? 'मैं समझता/समझती हूँ कि भुगतान से स्वीकृति की गारंटी नहीं है और वापसी नीति पढ़ ली है।' : 'I understand payment does not guarantee approval and have read the refund policy.'}</label>
+<button class="button" type="submit">{hi ? 'आवेदन जमा करें' : 'Submit application'}</button>
+</form></>}
+</div></section>
+{open && getRuntimeEnv().TURNSTILE_SITE_KEY && <script is:inline src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>}
+</BaseLayout>
+<script>import '../../scripts/reporter-application';</script>
+<style>
+  .reporter-form-wrap { max-width:900px; }
+  .contact-form { display:grid;gap:1.25rem; }
+  label { display:grid;gap:.5rem;font-weight:600; }
+  input:not([type="checkbox"]), select, textarea { width:100%;min-width:0;min-height:50px;padding:.72rem .82rem;border:1px solid var(--line-strong);border-radius:0;background:white;color:var(--ink-950);font:inherit; }
+  textarea { resize:vertical; }
+  small { font-weight:400; }
+  .check-label { display:flex;align-items:flex-start;font-weight:400; }
+  .check-label input { width:auto;flex-shrink:0;margin-top:.35rem; }
+  .payment-qr { width:min(100%,340px);height:auto; }
+  [hidden] { display:none !important; }
+  [data-payment-instructions], [data-payment-refund] { white-space:pre-line; }
+</style>

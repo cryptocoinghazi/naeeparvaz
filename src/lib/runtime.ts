@@ -1,5 +1,10 @@
 export function getRuntimeEnv(_locals?: App.Locals): RuntimeEnv {
   return {
+    YOUTUBE_API_KEY: process.env.YOUTUBE_API_KEY,
+    REPORTER_R2_BUCKET: process.env.REPORTER_R2_BUCKET,
+    REPORTER_R2_ACCESS_KEY_ID: process.env.REPORTER_R2_ACCESS_KEY_ID,
+    REPORTER_R2_SECRET_ACCESS_KEY: process.env.REPORTER_R2_SECRET_ACCESS_KEY,
+    REPORTER_SITE_ORIGIN: process.env.REPORTER_SITE_ORIGIN,
     ADMIN_EMAIL: process.env.ADMIN_EMAIL,
     CONTACT_FROM_EMAIL: process.env.CONTACT_FROM_EMAIL,
     DATABASE_CA_CERT: process.env.DATABASE_CA_CERT,

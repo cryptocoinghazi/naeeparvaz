@@ -1,5 +1,6 @@
 ---
 import VideoLibrary from "../../components/VideoLibrary.astro";
+import ContinuousTv from '../../components/ContinuousTv.astro';
 import SourceNotice from "../../components/SourceNotice.astro";
 import { getCopy, isLocale, localePath } from "../../data/i18n";
 import BaseLayout from "../../layouts/BaseLayout.astro";
@@ -26,6 +27,7 @@ const library = createVideoLibraryView(
   <section class="page-hero" aria-labelledby="videos-heading">
     <div class="container page-hero-inner"><p class="kicker">{copy.videos.kicker}</p><h1 id="videos-heading">{copy.videos.title}</h1><p>{copy.videos.lead}</p></div>
   </section>
+  <ContinuousTv locale={locale} />
   <VideoLibrary locale={locale} library={library} labels={labels} />
   <div class="container source-notice-wrap"><SourceNotice locale={locale} /></div>
 </BaseLayout>

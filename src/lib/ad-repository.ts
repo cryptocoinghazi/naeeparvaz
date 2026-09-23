@@ -2,6 +2,7 @@ import type { AdPlacement, Advertisement, Locale, PublishingStatus, ResolvedAdve
 import { getDatabase, timestamp } from "./database";
 
 interface AdRow {
+  deleted_at: Date | string | null;
   id: string;
   client_name: string;
   headline_en: string | null;
@@ -43,6 +44,7 @@ export interface AdvertisementInput {
 
 function fromRow(row: AdRow): Advertisement {
   return {
+    deletedAt: row.deleted_at ? timestamp(row.deleted_at) : undefined,
     id: row.id,
     clientName: row.client_name,
     headlineEn: row.headline_en ?? undefined,
@@ -83,27 +85,35 @@ export async function getAdminAdvertisements(locals: App.Locals): Promise<Advert
   }
 }
 
-export async function getActiveAdvertisement(locals: App.Locals, placement: AdPlacement, locale: Locale): Promise<ResolvedAdvertisement | undefined> {
+export async function getActiveAdvertisements(locals: App.Locals, locale: Locale): Promise<ResolvedAdvertisement[]> {
   const database = getDatabase(locals);
-  if (!database) return undefined;
+  if (!database) return [];
   try {
     const result = await database.query<AdRow>(`
       SELECT * FROM advertisements
-      WHERE placement = $1
-        AND status = 'published'
+      WHERE deleted_at IS NULL AND status = 'published'
         AND starts_at <= CURRENT_TIMESTAMP
         AND (ends_at IS NULL OR ends_at > CURRENT_TIMESTAMP)
-      ORDER BY priority DESC, created_at ASC
-    `, [placement]);
-    if (!result.rows.length) return undefined;
-    const highestPriority = result.rows[0].priority;
-    const candidates = result.rows.filter((row) => row.priority === highestPriority);
-    const rotationWindow = Math.floor(Date.now() / (10 * 60 * 1000));
-    return resolveAdvertisement(fromRow(candidates[rotationWindow % candidates.length]), locale);
+      ORDER BY priority DESC, created_at ASC, id ASC
+    `);
+    return result.rows.map((row) => resolveAdvertisement(fromRow(row), locale));
   } catch (error) {
     console.error("Unable to select advertisement", error);
-    return undefined;
+    return [];
   }
+}
+
+export function advertisementState(ad: Advertisement, now = Date.now()): string {
+  if (ad.deletedAt) return 'deleted';
+  if (ad.status !== 'published') return 'draft';
+  if (ad.endsAt && Date.parse(ad.endsAt) <= now) return 'expired';
+  return Date.parse(ad.startsAt) > now ? 'scheduled' : 'active';
+}
+
+export async function deleteAdvertisement(locals: App.Locals, id: string, restore: boolean): Promise<void> {
+  const db = getDatabase(locals);
+  if (!db) throw new Error('Database unavailable');
+  await db.query(`UPDATE advertisements SET deleted_at = ${restore ? 'NULL' : 'now()'}, status = 'draft', updated_at = now() WHERE id = $1`, [id]);
 }
 
 export async function saveAdvertisement(locals: App.Locals, input: AdvertisementInput): Promise<string> {

@@ -1,19 +1,19 @@
 ---
 import { getPublishingCopy } from "../data/publishing-copy";
-import { getActiveAdvertisement } from "../lib/ad-repository";
+import { getActiveAdvertisements } from "../lib/ad-repository";
 import { driveImagePath } from "../lib/drive-image";
 import type { AdPlacement, Locale } from "../types/content";
 
 interface Props { locale: Locale; placement: AdPlacement }
 const { locale, placement } = Astro.props;
-const ad = await getActiveAdvertisement(Astro.locals, placement, locale);
+const ads = await getActiveAdvertisements(Astro.locals, locale);
 const copy = getPublishingCopy(locale);
-const creative = ad?.creativeDriveId ? driveImagePath(ad.creativeDriveId) : undefined;
 ---
 
-{ad && (
+<div data-ad-carousel data-locale={locale} data-ads={JSON.stringify(ads)} hidden={!ads.length}>
   <aside class:list={["advertisement", `advertisement-${placement}`]} aria-label={copy.advertisement}>
     <div class="advertisement-label">{copy.advertisement}</div>
+    <div data-ad-slides>{ads.map((ad, index) => { const creative = ad.creativeDriveId ? driveImagePath(ad.creativeDriveId) : undefined; return <div hidden={index !== 0}>
     {ad.destinationUrl ? (
       <a class="advertisement-content" href={ad.destinationUrl} target="_blank" rel="sponsored noopener">
         {creative && <img src={creative} alt={ad.creativeAlt ?? ad.clientName} width="1200" height="400" loading="lazy" decoding="async" />}
@@ -25,6 +25,19 @@ const creative = ad?.creativeDriveId ? driveImagePath(ad.creativeDriveId) : unde
         {(ad.headline || ad.body) && <span class="advertisement-copy">{ad.headline && <strong>{ad.headline}</strong>}{ad.body && <span>{ad.body}</span>}</span>}
       </div>
     )}
+    </div>})}</div>
+    <div class="ad-controls" data-ad-controls hidden={ads.length < 2}>
+      <button type="button" data-ad-prev aria-label={locale === 'hi' ? 'पिछला विज्ञापन' : 'Previous advertisement'}>←</button>
+      <button type="button" data-ad-pause>{locale === 'hi' ? 'रोकें' : 'Pause'}</button>
+      <span data-ad-position aria-live="off"></span>
+      <button type="button" data-ad-next aria-label={locale === 'hi' ? 'अगला विज्ञापन' : 'Next advertisement'}>→</button>
+    </div>
     <p>{copy.adResponsibility}</p>
   </aside>
-)}
+</div>
+<script>import '../scripts/ad-carousel';</script>
+<style>
+  [hidden] { display: none !important; }
+  .ad-controls { display:flex; align-items:center; justify-content:center; gap:1rem; padding:.75rem; }
+  button { border:1px solid #bac8dc; padding:.5rem 1rem; background:white; color:#082f78; cursor:pointer; }
+</style>

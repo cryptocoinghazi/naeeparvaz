@@ -1,0 +1,18 @@
+---
+import EditorLayout from '../../../layouts/EditorLayout.astro';
+import { listApplications } from '../../../lib/reporters';
+let applications:Awaited<ReturnType<typeof listApplications>>=[];
+let ready=true;
+const rawPage=Number(Astro.url.searchParams.get('page') || 1);
+const page=Number.isSafeInteger(rawPage) && rawPage>0 && rawPage<=100000 ? rawPage : 1;
+try { applications=await listApplications(page); } catch { ready=false; }
+const hasNext=applications.length>50;
+applications=applications.slice(0,50);
+---
+<EditorLayout title="Reporter applications" description="Private review, payment verification and digital organizational IDs. No reporter publishing access is granted.">
+<a class="button" href="/editor/reporters/settings/">Registration settings & ID templates</a>
+{!ready && <p role="alert">Reporter tables are unavailable. Apply the local migration before testing.</p>}
+<section class="admin-section"><h2>Applications</h2><p>Page {page}. Evidence and cards are private.</p>
+{applications.length ? applications.map((app) => <article class="admin-ad-record"><h3><a href={`/editor/reporters/${app.id}/`}>{app.purged_at ? 'Removed profile' : app.profile.name}</a></h3><p>{app.status} · {new Date(app.created_at).toLocaleDateString('en-IN')} · {app.payment_verified?'Payment verified':'Payment not verified'}</p></article>) : <p>No applications yet.</p>}</section>
+<nav aria-label="Application pages">{page>1 && <a class="button button-outline" href={`?page=${page-1}`}>Previous</a>} {hasNext && <a class="button button-outline" href={`?page=${page+1}`}>Next</a>}</nav>
+</EditorLayout>

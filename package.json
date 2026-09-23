@@ -8,6 +8,11 @@
     "npm": "10.x"
   },
   "scripts": {
+    "tv:sync": "node --env-file-if-exists=.env --import tsx scripts/sync-tv.ts",
+    "reporters:maintenance": "node --env-file-if-exists=.env --import tsx scripts/reporter-maintenance.ts",
+    "test:enhancements": "node --import tsx --test tests/enhancements/*.test.ts",
+    "test:enhancements:db": "node --env-file=.env --import tsx --test tests/enhancements/database.test.ts",
+    "test:enhancements:browser": "node --env-file=.env tests/enhancements/browser.mjs",
     "dev": "astro dev",
     "build": "astro build",
     "preview": "node ./dist/server/entry.mjs",
@@ -29,7 +34,10 @@
     "@aws-sdk/s3-request-presigner": "^3.1121.0",
     "astro": "^7.2.4",
     "mp4box": "^2.4.1",
-    "pg": "^8.23.0"
+    "pdf-lib": "^1.17.1",
+    "pg": "^8.23.0",
+    "sharp": "^0.35.4",
+    "tsx": "^4.23.15"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.10",

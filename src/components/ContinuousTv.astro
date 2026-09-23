@@ -1,0 +1,17 @@
+---
+import { tvSettings, tvQueue } from '../lib/tv';
+import type { Locale } from '../types/content';
+interface Props { locale: Locale }
+const { locale } = Astro.props;
+const settings = await tvSettings();
+const queue = settings.enabled ? await tvQueue() : [];
+const hi = locale === 'hi';
+---
+{settings.enabled && <section class="section tv-section" data-tv data-locale={locale} data-queue={JSON.stringify(queue)}><div class="container">
+<p class="kicker">{hi ? 'निरंतर प्रसारण • रिकॉर्डेड रिपोर्ट' : 'Continuous playback • Recorded reports'}</p><h2>{hi ? 'नई परवाज़ TV' : 'Naee Parvaz TV'}</h2>
+<div class="tv-frame"><div data-tv-player></div></div>
+<p data-tv-title aria-live="polite"></p><p data-tv-status role="status">{queue.length ? (hi ? 'वीडियो लोड हो रहा है…' : 'Loading video…') : (hi ? 'अभी कोई वीडियो उपलब्ध नहीं है।' : 'No videos available yet.')}</p>
+{queue.length > 0 && <div class="tv-controls"><button class="button" data-tv-play>{hi ? 'चलाएँ / रोकें' : 'Play / pause'}</button><button class="button button-outline" data-tv-next>{hi ? 'अगला वीडियो' : 'Next video'}</button><button class="button button-outline" data-tv-sound>{hi ? 'आवाज़ चालू / बंद' : 'Sound on / off'}</button><label><input type="checkbox" data-tv-shuffle/> {hi ? 'यादृच्छिक क्रम' : 'Shuffle'}</label></div>}
+</div></section>}
+<script>import '../scripts/continuous-tv';</script>
+<style>.tv-section { background:#071d42; color:white; } .tv-section h2 { color:white; } .tv-section .kicker { color:#ffcf33; } .tv-frame { aspect-ratio:16/9; width:100%; background:#000; } .tv-frame :global(iframe) { width:100%; height:100%; } .tv-controls { display:flex; gap:1rem; flex-wrap:wrap; align-items:center; } .tv-controls .button-outline { color:white; border-color:white; } </style>

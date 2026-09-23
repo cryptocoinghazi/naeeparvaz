@@ -1,0 +1,49 @@
+import type { Profile, ReporterSettings } from '../lib/reporters';
+const begin=document.querySelector<HTMLFormElement>('[data-reporter-begin]');
+const form=document.querySelector<HTMLFormElement>('[data-reporter-form]');
+if(begin && form) {
+  let token=''; const hi=form.dataset.locale==='hi';
+  const status=document.querySelector<HTMLElement>('[data-reporter-status]')!;
+  const uploaded=new Map<string,File>();
+  const correction=new URL(location.href).searchParams.get('correction') || undefined;
+  // Remove the bearer link from history/address bar after capturing it.
+  if(correction) history.replaceState(null,'',location.pathname);
+  begin.addEventListener('submit',async(event) => {
+    event.preventDefault(); const button=begin.querySelector<HTMLButtonElement>('button')!; button.disabled=true;
+    try {
+      const data=new FormData(begin);
+      const response=await fetch('/api/reporters/session/',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:data.get('email'),turnstile:data.get('cf-turnstile-response'),correction})});
+      const result=await response.json() as {token:string;error?:string;profile?:Profile;files?:string[];terms:ReporterSettings};
+      if(!response.ok) throw new Error(result.error);
+      token=result.token; const s=result.terms;
+      if(result.profile) for(const [key,value] of Object.entries(result.profile)) {const field=form.elements.namedItem(key); if(field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement || field instanceof HTMLSelectElement) field.value=value;}
+      for(const kind of result.files || []) {const field=form.querySelector<HTMLInputElement>(`[data-file-kind="${kind}"]`); if(field) field.required=false; const note=form.querySelector(`[data-existing-kind="${kind}"]`); if(note) note.textContent=hi?'पहले अपलोड की गई फ़ाइल मौजूद है; बदलना वैकल्पिक है।':'Existing file retained; replacement optional.';}
+      document.querySelector('[data-payment-summary]')!.textContent=`₹${s.fee.toFixed(2)} — ${s.payee}`;
+      document.querySelector<HTMLImageElement>('[data-payment-qr]')!.src=`/api/reporters/qr/?version=${encodeURIComponent(s.qrKey || 'original')}`;
+      document.querySelector('[data-payment-instructions]')!.textContent=hi?s.instructionsHi:s.instructionsEn;
+      document.querySelector('[data-payment-refund]')!.textContent=hi?s.refundHi:s.refundEn;
+      document.querySelector('[data-retention]')!.textContent=hi?`अंतिम समीक्षा के ${s.evidenceDays} दिन बाद प्रमाण हटाए जाएँगे। फोटो, प्रोफ़ाइल और कार्ड वैधता समाप्ति या निरस्तीकरण के ${s.profileDays} दिन बाद हटेंगे।`:`Evidence is removed ${s.evidenceDays} days after final review. Your profile, photo and card are retained until ${s.profileDays} days after expiry or revocation.`;
+      begin.hidden=true; form.hidden=false; status.textContent=hi?'30 मिनट के भीतर आवेदन पूरा करें।':'Complete your application within 30 minutes.';
+      form.querySelector<HTMLInputElement>('input')?.focus();
+    } catch(error) {status.textContent=error instanceof Error?error.message:'Unable to start.';}
+    finally {button.disabled=false;}
+  });
+  form.addEventListener('submit',async(event) => {
+    event.preventDefault(); const button=form.querySelector<HTMLButtonElement>('button[type="submit"]')!; button.disabled=true;
+    try {
+      for(const field of form.querySelectorAll<HTMLInputElement>('[data-file-kind]')) {
+        const file=field.files?.[0],kind=field.dataset.fileKind!;
+        if(!file || uploaded.get(kind)===file) continue;
+        if(file.size>5*1024*1024) throw new Error(hi?'फ़ाइल 5 MB से बड़ी है।':'Each file must be 5 MB or smaller.');
+        status.textContent=hi?'फ़ाइल अपलोड हो रही है…':`Uploading ${kind}…`;
+        const response=await fetch('/api/reporters/upload/',{method:'POST',headers:{'Content-Type':'application/octet-stream','X-Application-Token':token,'X-File-Kind':kind},body:file});
+        if(!response.ok) throw new Error((await response.json()).error); uploaded.set(kind,file);
+      }
+      const data=Object.fromEntries(new FormData(form)); data.locale=hi?'hi':'en';
+      const response=await fetch('/api/reporters/submit/',{method:'POST',headers:{'Content-Type':'application/json','X-Application-Token':token},body:JSON.stringify(data)});
+      const result=await response.json(); if(!response.ok) throw new Error(result.error);
+      form.hidden=true; status.textContent=hi?`आवेदन प्राप्त हुआ। संदर्भ: ${result.id}`:`Application received. Reference: ${result.id}. Email delivery is tracked by the editor.`; status.scrollIntoView({block:'center'});
+    } catch(error) {status.textContent=error instanceof Error?error.message:'Submission failed.';}
+    finally {button.disabled=false;}
+  });
+}
