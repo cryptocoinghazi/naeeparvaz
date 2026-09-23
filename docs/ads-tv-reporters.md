@@ -70,6 +70,8 @@ Applicants supply an email, required profile details, portrait, one identity pro
 
 Upload sessions expire after 30 minutes and are bound to an email/application, with request and file limits. Correction links expire after seven days and are consumed on successful resubmission. All documents are private downloads; PDFs are rejected if malformed/encrypted or detected to contain active actions. This validation is not an antivirus service; treat applicant attachments as untrusted.
 
+Application text constraints are shared by the browser and server. Invalid submissions identify the field (including consent, payment date or missing upload); correcting a field retains selected/already uploaded files within the same session. Expired sessions require a fresh application. Submission diagnostics log only an event, random support reference, stage, fixed error/field code and an allowlisted database error code, never applicant values, tokens, file names or raw exceptions. Acknowledgement dispatch errors after commit do not turn a saved application into a failed submission; the recorded email status remains available to the editor.
+
 ## Issuance, delivery and maintenance
 
 Mark an application under review, verify payment, then enter designation/joining date and adjust crop. Generate and inspect a fresh preview. Approval requires that exact application/template/number version and confirmation. The next number is locked transactionally; concurrent approvals cannot reuse it. Long text that does not fit is rejected; adjust the template rather than silently clipping.

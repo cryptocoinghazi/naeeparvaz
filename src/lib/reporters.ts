@@ -4,6 +4,7 @@ import { getDatabase, withTransaction } from './database';
 import { anniversary, indiaToday, defaultCardLayout, validateCardLayout, type CardLayout } from './reporter-card';
 import { reporterStorageReady, putPrivate, validateReporterFile } from './reporter-storage';
 import { requiredText, optionalText, validEmail } from './validation';
+import { ReporterInputError, reporterText } from './reporter-input';
 
 export interface ReporterSettings {
   enabled:boolean; fee:number; payee:string; instructionsEn:string; instructionsHi:string;
@@ -83,25 +84,25 @@ export async function uploadApplicationFile(token:string,kind:string,bytes:Buffe
   return id;
 }
 export function validateProfile(form:FormData,email:string):Profile {
-  const p:Profile={name:requiredText(form.get('name'),'Name',2,100),email,phone:requiredText(form.get('phone'),'Phone',7,30),address:requiredText(form.get('address'),'Address',10,600),area:requiredText(form.get('area'),'Reporting area',2,200),languages:requiredText(form.get('languages'),'Languages',2,200),education:requiredText(form.get('education'),'Education',2,300),experience:requiredText(form.get('experience'),'Experience (or none)',2,2000),identityType:String(form.get('identityType') || ''),transaction:requiredText(form.get('transaction'),'Transaction reference',4,100),paymentDate:requiredText(form.get('paymentDate'),'Payment date',10,10),workSamples:optionalText(form.get('workSamples'),'Work samples',2000)};
-  if(!['masked-aadhaar','voter-id','driving-licence'].includes(p.identityType)) throw new Error('Choose an identity proof.');
-  anniversary(p.paymentDate); // Strict calendar validation (rejects dates such as February 30).
-  if(p.paymentDate>indiaToday()) throw new Error('Invalid payment date.');
-  if(form.get('consent')!=='yes' || form.get('paymentConsent')!=='yes') throw new Error('Consent is required.');
+  const p:Profile={name:reporterText(form,'name'),email,phone:reporterText(form,'phone'),address:reporterText(form,'address'),area:reporterText(form,'area'),languages:reporterText(form,'languages'),education:reporterText(form,'education'),experience:reporterText(form,'experience'),identityType:String(form.get('identityType') || ''),transaction:reporterText(form,'transaction'),paymentDate:String(form.get('paymentDate') || ''),workSamples:reporterText(form,'workSamples')};
+  if(!['masked-aadhaar','voter-id','driving-licence'].includes(p.identityType)) throw new ReporterInputError('INVALID_FIELD','identityType','Choose an identity proof type. / पहचान प्रमाण का प्रकार चुनें।');
+  try {anniversary(p.paymentDate); if(p.paymentDate>indiaToday()) throw new Error();}
+  catch {throw new ReporterInputError('INVALID_FIELD','paymentDate','Choose a valid payment date that is not in the future. / भुगतान की सही तारीख चुनें; भविष्य की तारीख मान्य नहीं है।');}
+  for(const field of ['consent','paymentConsent']) if(form.get(field)!=='yes') throw new ReporterInputError('CONSENT_REQUIRED',field,field==='consent'?'Please consent to application review and document use. / आवेदन समीक्षा और दस्तावेज़ उपयोग की सहमति दें।':'Please acknowledge the payment and refund terms. / भुगतान और वापसी की शर्तें स्वीकार करें।');
   return p;
 }
 export async function submitApplication(token:string,form:FormData):Promise<string> {
   return withTransaction({},async (client) => {
     const session=(await client.query('SELECT * FROM reporter_upload_sessions WHERE token_hash=$1 FOR UPDATE',[hashToken(token)])).rows[0];
-    if(!session) throw new Error('Invalid session.');
+    if(!session) throw new ReporterInputError('SESSION_INVALID','','Your application session is invalid. Start a new application. / आवेदन सत्र अमान्य है। नया आवेदन शुरू करें।');
     if(session.submitted_id) return session.submitted_id;
-    if(new Date(session.expires_at).getTime()<Date.now()) throw new Error('Session expired.');
+    if(new Date(session.expires_at).getTime()<Date.now()) throw new ReporterInputError('SESSION_EXPIRED','','Your 30-minute application session expired. Start a new application and upload the files again. / 30 मिनट का आवेदन सत्र समाप्त हुआ। नया आवेदन शुरू करके फ़ाइलें दोबारा अपलोड करें।');
     const profile=validateProfile(form,session.email);
     const existing=session.application_id ? (await client.query('SELECT * FROM reporter_applications WHERE id=$1 FOR UPDATE',[session.application_id])).rows[0] : undefined;
-    if(existing && (existing.status!=='changes-requested' || existing.purged_at)) throw new Error('Correction is no longer available.');
+    if(existing && (existing.status!=='changes-requested' || existing.purged_at)) throw new ReporterInputError('CORRECTION_CLOSED','','Corrections are no longer available. Contact the editor. / संशोधन उपलब्ध नहीं है। संपादक से संपर्क करें।');
     const files=(await client.query('SELECT * FROM reporter_files WHERE session_id=$1 AND validated=true AND deleted_at IS NULL ORDER BY created_at DESC',[session.id])).rows;
     const previous=existing ? (await client.query('SELECT * FROM reporter_files WHERE application_id=$1 AND deleted_at IS NULL AND validated=true',[existing.id])).rows : [];
-    for(const kind of ['photo','identity','payment']) if(!files.some((f) => f.kind===kind) && !previous.some((f) => f.kind===kind)) throw new Error(`Missing ${kind} upload.`);
+    for(const kind of ['photo','identity','payment']) if(!files.some((f) => f.kind===kind) && !previous.some((f) => f.kind===kind)) throw new ReporterInputError('MISSING_UPLOAD',kind,`Missing ${kind} upload. Select and upload this file again. / ${kind} फ़ाइल नहीं मिली। दोबारा चुनकर अपलोड करें।`);
     const id=existing?.id || randomUUID();
     if(existing) await client.query("UPDATE reporter_applications SET profile=$2,status='submitted',payment_verified=false,updated_at=now() WHERE id=$1",[id,profile]);
     else await client.query('INSERT INTO reporter_applications(id,locale,profile,payment_terms) VALUES($1,$2,$3,$4)',[id,form.get('locale')==='hi'?'hi':'en',profile,session.terms]);

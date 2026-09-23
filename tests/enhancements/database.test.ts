@@ -13,6 +13,7 @@ import { deliverApplicationEmails, deliverReporterEmail } from '../../src/lib/re
 import { reporterMaintenance, maintenanceState } from '../../src/lib/reporter-maintenance';
 import { saveAdvertisement, getActiveAdvertisements, deleteAdvertisement } from '../../src/lib/ad-repository';
 import { syncTv, tvQueue } from '../../src/lib/tv';
+import { POST as submitRoute } from '../../src/pages/api/reporters/submit';
 
 test('isolated local schema: migrations, ads, YouTube synchronization, reporter lifecycle and retention', {skip:process.env.ENHANCEMENT_DB_TEST!=='1',timeout:180000},async() => {
   const url=new URL(process.env.DATABASE_URL || '');
@@ -67,10 +68,26 @@ test('isolated local schema: migrations, ads, YouTube synchronization, reporter 
     Object.entries({name:'Test Reporter',phone:'9999999999',address:'Test address Yavatmal',area:'Yavatmal',languages:'Hindi',education:'Graduate',experience:'None',identityType:'voter-id',transaction:'TEST-123',paymentDate:'2026-01-01',consent:'yes',paymentConsent:'yes',locale:'en'}).forEach(([k,v])=>profile.set(k,v));
     const session=await startApplication('applicant@example.invalid');
     await assert.rejects(submitApplication(session.token,profile),/Missing/);
+    const apiSubmit=(data:unknown,token=session.token) => submitRoute({request:new Request('https://test.invalid/api/reporters/submit/',{method:'POST',headers:{Origin:'https://test.invalid','Content-Type':'application/json','X-Application-Token':token},body:JSON.stringify(data)})} as Parameters<typeof submitRoute>[0]);
+    const originalError=console.error,safeLogs:string[]=[];
+    try {
+      console.error=(message:unknown)=>safeLogs.push(String(message));
+      const invalid=await apiSubmit({...Object.fromEntries(profile),experience:'0'});
+      assert.equal(invalid.status,422);assert.equal((await invalid.json()).field,'experience');
+      const missing=await apiSubmit(Object.fromEntries(profile));assert.equal((await missing.json()).code,'MISSING_UPLOAD');
+      const unknownSession=await apiSubmit(Object.fromEntries(profile),'invalid-token');assert.equal((await unknownSession.json()).code,'SESSION_INVALID');
+      await db.query("UPDATE reporter_upload_sessions SET expires_at=now()-interval '1 minute' WHERE token_hash=$1",[hashToken(session.token)]);
+      const expired=await apiSubmit(Object.fromEntries(profile));assert.equal((await expired.json()).code,'SESSION_EXPIRED');
+      await db.query("UPDATE reporter_upload_sessions SET expires_at=now()+interval '30 minutes' WHERE token_hash=$1",[hashToken(session.token)]);
+      const malformed=await apiSubmit(null);assert.equal(malformed.status,400);
+      assert.ok(safeLogs.every(line=>!line.includes(session.token) && !line.includes('Test Reporter') && !line.includes('TEST-123') && !line.includes('applicant@')),'Diagnostics never include applicant values or bearer tokens');
+      assert.ok(safeLogs.every(line=>JSON.parse(line).reference),'Diagnostics have a support reference');
+    } finally {console.error=originalError;}
     await assert.rejects(uploadApplicationFile('forged','photo',png));
     for(const kind of ['photo','identity','payment']) await uploadApplicationFile(session.token,kind,png);
-    const id=await submitApplication(session.token,profile);assert.equal(await submitApplication(session.token,profile),id,'Duplicate submission returns original ID');
+    const created=await apiSubmit(Object.fromEntries(profile));assert.equal(created.status,200);const {id}=await created.json();assert.equal(await submitApplication(session.token,profile),id,'Duplicate submission returns original ID');
     await deliverApplicationEmails(id);assert.equal(sent,1);
+    const duplicate=await apiSubmit(Object.fromEntries(profile));assert.equal(duplicate.status,200);assert.equal((await duplicate.json()).id,id);assert.equal(sent,1,'HTTP retry neither duplicates the application nor sends another acknowledgement');
     const previewForm=new FormData();Object.entries({designation:'REPORTER',joined:new Date().toISOString().slice(0,10),cropX:'50',cropY:'50',zoom:'1'}).forEach(([k,v])=>previewForm.set(k,v));
     let preview=await createCardPreview(id,previewForm);await assert.rejects(approveApplication(id,preview,'editor'),/verify payment/);
     await reviewApplication(id,'verify-payment','','editor');await assert.rejects(approveApplication(id,preview,'editor'),/fresh preview/);

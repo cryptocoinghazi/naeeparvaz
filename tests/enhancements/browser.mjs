@@ -114,6 +114,32 @@ try {
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Expanded form fits');
     const a11y=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();assert.deepEqual(a11y.violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)})),[],'Expanded form accessibility');
     await page.screenshot({path:`test-results/enhancements/application-${viewport.width}.png`,fullPage:true});
+    let uploads=0,submissions=0;
+    await page.route('**/api/reporters/upload/',route=>{uploads++;return route.fulfill({json:{id:'test-file'}});});
+    await page.route('**/api/reporters/submit/',route=>{
+      submissions++;
+      assert.equal(route.request().postDataJSON().experience,'None');
+      return route.fulfill(submissions===1?{status:422,json:{error:'Choose a valid payment date.',field:'paymentDate',code:'INVALID_FIELD',reference:'test-reference'}}:{json:{id:'test-application'}});
+    });
+    for(const [field,value] of Object.entries({name:'Test Reporter',phone:'9999999999',address:'Test address district',area:'Yavatmal',languages:'Hindi',education:'Graduate',experience:' ',transaction:'TEST-123',paymentDate:'2026-01-01'}))await page.locator(`[data-reporter-form] [name="${field}"]`).fill(value);
+    for(const kind of ['photo','identity','payment'])await page.locator(`[data-file-kind="${kind}"]`).setInputFiles({name:'test.png',mimeType:'image/png',buffer:Buffer.from('mocked upload')});
+    await page.locator('[name="consent"]').check();await page.locator('[name="paymentConsent"]').check();
+    await page.locator('[data-reporter-form]').dispatchEvent('submit');
+    await page.locator('[name="experience"][aria-invalid="true"]').waitFor();
+    assert.equal(uploads,0,'Invalid trimmed text is caught before uploading');
+    assert.equal(submissions,0);
+    await page.locator('[name="experience"]').fill('None');
+    await page.locator('[data-reporter-form] button[type="submit"]').click();
+    await page.locator('[name="paymentDate"][aria-invalid="true"]').waitFor();
+    assert.equal(await page.locator('[name="name"]').inputValue(),'Test Reporter','Server validation preserves entered values');
+    assert.equal(await page.locator('[data-file-kind="photo"]').evaluate(input=>input.files.length),1,'Selected uploads are preserved');
+    assert.equal(uploads,3);
+    assert.match(await page.locator('[data-reporter-status]').innerText(),/test-reference/);
+    await page.locator('[name="paymentDate"]').fill('2026-01-02');
+    await page.locator('[data-reporter-form] button[type="submit"]').click();
+    await page.locator('[data-reporter-form]').waitFor({state:'hidden'});
+    assert.equal(uploads,3,'Correcting a field does not upload the same files twice');
+    assert.match(await page.locator('[data-reporter-status]').innerText(),/Application received/);
     assert.deepEqual(errors,[],'No browser script exceptions');
     await context.close();
   }

@@ -4,6 +4,7 @@ import { isLocale } from '../../data/i18n';
 import { reporterSettings, applicationsConfigured } from '../../lib/reporters';
 import { getRuntimeEnv } from '../../lib/runtime';
 import { indiaToday } from '../../lib/reporter-card';
+import { reporterTextRules } from '../../lib/reporter-input';
 const locale=Astro.params.locale; if(!isLocale(locale)) return new Response('Not found',{status:404});
 const hi=locale==='hi';
 const s=await reporterSettings();
@@ -21,7 +22,7 @@ Astro.response.headers.set('Cache-Control','no-store'); Astro.response.headers.s
 <button class="button" type="submit">{hi ? 'आवेदन शुरू करें' : 'Begin application'}</button></form>
 <p data-reporter-status role="status" aria-live="polite"></p>
 <form data-reporter-form data-locale={locale} class="contact-form" hidden>
-<div class="form-grid">{fields.map(([name,en,hindi]) => <label>{hi ? hindi : en}{['address','experience','workSamples'].includes(name) ? <textarea name={name} required={name!=='workSamples'} rows="3" maxlength={name==='address'?600:2000}></textarea> : <input name={name} required maxlength={name==='name'?100:name==='phone'?30:200}/>}</label>)}</div>
+<div class="form-grid">{fields.map(([name,en,hindi]) => {const rule=reporterTextRules[name as keyof typeof reporterTextRules];return <label>{hi ? hindi : en}{['address','experience','workSamples'].includes(name) ? <textarea name={name} required={name!=='workSamples'} rows="3" minlength={rule.min} maxlength={rule.max}></textarea> : <input name={name} required minlength={rule.min} maxlength={rule.max}/>}<small>{hi?`${rule.min}–${rule.max} अक्षर`:`${rule.min}–${rule.max} characters`}</small></label>;})}</div>
 <label>{hi ? 'पहचान प्रमाण का प्रकार' : 'Identity proof type'}<select name="identityType" required><option value="masked-aadhaar">{hi ? 'मास्क्ड आधार (पहले 8 अंक छिपे हों)' : 'Masked Aadhaar (first 8 digits hidden)'}</option><option value="voter-id">{hi ? 'मतदाता पहचान पत्र' : 'Voter ID'}</option><option value="driving-licence">{hi ? 'ड्राइविंग लाइसेंस' : 'Driving licence'}</option></select></label>
 <p>{hi ? 'आधार अनिवार्य नहीं है। पूरा आधार नंबर या PAN अपलोड न करें।' : 'Aadhaar is optional. Do not upload an unmasked Aadhaar or PAN card.'}</p>
 <section aria-labelledby="payment-title"><h2 id="payment-title">{hi ? 'भुगतान विवरण' : 'Payment details'}</h2><p data-payment-summary></p><img data-payment-qr src="/api/reporters/qr/" width="983" height="1280" alt={hi ? 'भुगतान QR कोड; प्राप्तकर्ता का नाम जाँचें' : 'Payment QR code; verify the recipient name'} class="payment-qr"/><p data-payment-instructions></p><h3>{hi ? 'वापसी नीति' : 'Refund policy'}</h3><p data-payment-refund></p></section>

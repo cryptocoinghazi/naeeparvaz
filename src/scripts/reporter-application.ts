@@ -1,10 +1,23 @@
 import type { Profile, ReporterSettings } from '../lib/reporters';
+import { ReporterInputError, reporterText, reporterTextRules } from '../lib/reporter-input';
 const begin=document.querySelector<HTMLFormElement>('[data-reporter-begin]');
 const form=document.querySelector<HTMLFormElement>('[data-reporter-form]');
 if(begin && form) {
   let token=''; const hi=form.dataset.locale==='hi';
   const status=document.querySelector<HTMLElement>('[data-reporter-status]')!;
   const uploaded=new Map<string,File>();
+  let invalidField:HTMLInputElement|HTMLTextAreaElement|HTMLSelectElement|undefined;
+  const fieldError=document.createElement('small');fieldError.id='reporter-field-error';fieldError.setAttribute('role','alert');
+  const clearFieldError=() => {invalidField?.removeAttribute('aria-invalid');invalidField?.removeAttribute('aria-describedby');fieldError.remove();invalidField=undefined;};
+  const showFieldError=(field:string,message:string) => {
+    clearFieldError();
+    const candidate=(field.startsWith('file:')?null:form.elements.namedItem(field)) || Array.from(form.querySelectorAll<HTMLInputElement>('[data-file-kind]')).find(input=>input.dataset.fileKind===field.replace(/^file:/,''));
+    if(candidate instanceof HTMLInputElement || candidate instanceof HTMLTextAreaElement || candidate instanceof HTMLSelectElement) {
+      invalidField=candidate;candidate.setAttribute('aria-invalid','true');candidate.setAttribute('aria-describedby',fieldError.id);
+      fieldError.textContent=message;candidate.after(fieldError);candidate.focus();candidate.scrollIntoView({block:'center'});
+    }
+  };
+  form.addEventListener('input',event=>{if(event.target===invalidField)clearFieldError();});
   const correction=new URL(location.href).searchParams.get('correction') || undefined;
   // Remove the bearer link from history/address bar after capturing it.
   if(correction) history.replaceState(null,'',location.pathname);
@@ -31,19 +44,28 @@ if(begin && form) {
   form.addEventListener('submit',async(event) => {
     event.preventDefault(); const button=form.querySelector<HTMLButtonElement>('button[type="submit"]')!; button.disabled=true;
     try {
+      clearFieldError();
+      const values=new FormData(form);
+      // Validate trimmed values before uploading anything, including when HTML validation is bypassed.
+      for(const key of Object.keys(reporterTextRules) as (keyof typeof reporterTextRules)[]) reporterText(values,key);
       for(const field of form.querySelectorAll<HTMLInputElement>('[data-file-kind]')) {
         const file=field.files?.[0],kind=field.dataset.fileKind!;
         if(!file || uploaded.get(kind)===file) continue;
-        if(file.size>5*1024*1024) throw new Error(hi?'फ़ाइल 5 MB से बड़ी है।':'Each file must be 5 MB or smaller.');
+        if(file.size>5*1024*1024) throw new ReporterInputError('FILE_TOO_LARGE',`file:${kind}`,hi?'फ़ाइल 5 MB से बड़ी है।':'This file must be 5 MB or smaller.');
         status.textContent=hi?'फ़ाइल अपलोड हो रही है…':`Uploading ${kind}…`;
         const response=await fetch('/api/reporters/upload/',{method:'POST',headers:{'Content-Type':'application/octet-stream','X-Application-Token':token,'X-File-Kind':kind},body:file});
-        if(!response.ok) throw new Error((await response.json()).error); uploaded.set(kind,file);
+        if(!response.ok) throw new ReporterInputError('UPLOAD_REJECTED',`file:${kind}`,(await response.json()).error); uploaded.set(kind,file);
       }
       const data=Object.fromEntries(new FormData(form)); data.locale=hi?'hi':'en';
       const response=await fetch('/api/reporters/submit/',{method:'POST',headers:{'Content-Type':'application/json','X-Application-Token':token},body:JSON.stringify(data)});
-      const result=await response.json(); if(!response.ok) throw new Error(result.error);
+      const result=await response.json();
+      if(!response.ok) {
+        if(result.code==='MISSING_UPLOAD' && typeof result.field==='string') uploaded.delete(result.field);
+        if(typeof result.field==='string') showFieldError(result.field,result.error);
+        throw new Error(`${result.error}${result.reference?` (${hi?'संदर्भ':'Reference'}: ${result.reference})`:''}`);
+      }
       form.hidden=true; status.textContent=hi?`आवेदन प्राप्त हुआ। संदर्भ: ${result.id}`:`Application received. Reference: ${result.id}. Email delivery is tracked by the editor.`; status.scrollIntoView({block:'center'});
-    } catch(error) {status.textContent=error instanceof Error?error.message:'Submission failed.';}
+    } catch(error) {status.textContent=error instanceof Error?error.message:'Submission failed.';if(error instanceof ReporterInputError)showFieldError(error.field,error.message);if(!invalidField)status.scrollIntoView({block:'center'});}
     finally {button.disabled=false;}
   });
 }
