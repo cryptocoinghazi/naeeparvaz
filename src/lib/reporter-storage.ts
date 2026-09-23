@@ -21,7 +21,7 @@ export async function getPrivate(key:string): Promise<Buffer> {
   return Buffer.from(await object.Body.transformToByteArray());
 }
 export async function deletePrivate(key:string) {
-  const {client,bucket} = config(); await client.send(new DeleteObjectCommand({Bucket:bucket,Key:key}));
+  const {client,bucket} = config(); await client.send(new DeleteObjectCommand({Bucket:bucket,Key:key}),{abortSignal:AbortSignal.timeout(5000)});
 }
 export async function readLimited(request:Request, limit=fileLimit): Promise<Buffer> {
   if (Number(request.headers.get('content-length') || 0) > limit) throw new Error('File too large.');

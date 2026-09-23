@@ -33,7 +33,7 @@ try {
   let ready=false;
   for(let i=0;i<50;i++) {try {const r=await fetch(base+'/en/');if(r.ok){ready=true;break;}}catch {}await delay(200);}
   assert.ok(ready,`Test server did not start: ${logs.slice(-2000)}`);
-  for(const path of ['/api/editor/reporters/file/?id='+appId,'/api/editor/reporters/action/','/api/editor/tv/']) {
+  for(const path of ['/api/editor/reporters/file/?id='+appId,'/api/editor/reporters/action/','/api/editor/reporters/maintenance/','/api/editor/tv/']) {
     const response=await fetch(base+path,{method:path.includes('file')?'GET':'POST',headers:{Origin:base,'Content-Type':'application/json'},redirect:'manual'});assert.ok([401,403].includes(response.status),`${path} is protected`);
   }
   browser=await chromium.launch({headless:true});
@@ -69,6 +69,17 @@ try {
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),`${path}: no horizontal overflow at ${viewport.width}`);
       const results=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();
       assert.deepEqual(results.violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)})),[],`${path}: accessibility`);
+      if(path==='/editor/reporters/' && viewport.width===1440) {
+        const missingConfirm=await fetch(base+'/api/editor/reporters/maintenance/',{method:'POST',headers:{Origin:base,Cookie:`__Host-naee_admin=${session}`,'Content-Type':'application/x-www-form-urlencoded'},body:'',redirect:'manual'});
+        assert.ok(missingConfirm.headers.get('location')?.includes('maintenance=confirm'));
+        const crossOrigin=await fetch(base+'/api/editor/reporters/maintenance/',{method:'POST',headers:{Origin:'https://untrusted.invalid',Cookie:`__Host-naee_admin=${session}`,'Content-Type':'application/x-www-form-urlencoded'},body:'confirm=yes',redirect:'manual'});
+        assert.ok(crossOrigin.status===403 || crossOrigin.headers.get('location')?.includes('maintenance=failed'));
+        assert.equal((await scoped.query('SELECT status FROM reporter_maintenance_state')).rows[0].status,'idle');
+        await page.locator('form[action="/api/editor/reporters/maintenance/"] input[name="confirm"]').check();
+        await page.getByRole('button',{name:'Run maintenance now'}).click();
+        await page.waitForURL(url=>url.searchParams.get('maintenance')==='succeeded',{waitUntil:'domcontentloaded'});
+        assert.equal((await scoped.query('SELECT status FROM reporter_maintenance_state')).rows[0].status,'succeeded');
+      }
       if(path===`/editor/reporters/${appId}/` && viewport.width===1440) {
         await page.locator('select[name="action"]').selectOption('under-review');
         const savedResponse=page.waitForResponse(response=>response.url().includes('/api/editor/reporters/action/'));

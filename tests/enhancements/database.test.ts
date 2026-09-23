@@ -10,7 +10,7 @@ import { database, reporterDefaults, startApplication, uploadApplicationFile, su
 import { defaultCardLayout } from '../../src/lib/reporter-card';
 import { createCardPreview, approveApplication, reviewApplication } from '../../src/lib/reporter-review';
 import { deliverApplicationEmails, deliverReporterEmail } from '../../src/lib/reporter-email';
-import { reporterMaintenance } from '../../src/lib/reporter-maintenance';
+import { reporterMaintenance, maintenanceState } from '../../src/lib/reporter-maintenance';
 import { saveAdvertisement, getActiveAdvertisements, deleteAdvertisement } from '../../src/lib/ad-repository';
 import { syncTv, tvQueue } from '../../src/lib/tv';
 
@@ -20,7 +20,7 @@ test('isolated local schema: migrations, ads, YouTube synchronization, reporter 
   const schema=`np_enhancement_test_${randomUUID().replaceAll('-','')}`;
   const admin=new pg.Pool({connectionString:url.toString(),max:1});
   const originalFetch=globalThis.fetch,originalSend=S3Client.prototype.send;
-  const memory=new Map<string,Buffer>(); let deliveryMode='ok'; let sent=0; let youtubeFail=false;
+  const memory=new Map<string,Buffer>(); let deliveryMode='ok'; let sent=0; let youtubeFail=false; let deleteFails=false;
   try {
     await admin.query(`CREATE SCHEMA ${schema}`);
     url.searchParams.set('options',`-c search_path=${schema}`);process.env.DATABASE_URL=url.toString();
@@ -29,7 +29,7 @@ test('isolated local schema: migrations, ads, YouTube synchronization, reporter 
       const key=command.input.Key;
       if(command.constructor.name==='PutObjectCommand') {memory.set(key,Buffer.from(command.input.Body!));return {};}
       if(command.constructor.name==='GetObjectCommand') {const bytes=memory.get(key);if(!bytes)throw new Error('Missing test object');return {ContentLength:bytes.length,Body:{transformToByteArray:async()=>bytes}};}
-      if(command.constructor.name==='DeleteObjectCommand') {memory.delete(key);return {};}
+      if(command.constructor.name==='DeleteObjectCommand') {if(deleteFails)throw new Error('Test storage failure');memory.delete(key);return {};}
       throw new Error('Unexpected storage operation');
     }) as typeof S3Client.prototype.send;
     globalThis.fetch=(async(input:URL|string|Request) => {
@@ -43,10 +43,12 @@ test('isolated local schema: migrations, ads, YouTube synchronization, reporter 
     }) as typeof fetch;
     const db=database();
     const migrations=(await readdir('db/migrations')).filter((n)=>n.endsWith('.sql')).sort();
-    for(const file of migrations.filter((n)=>!n.startsWith('005'))) await db.query(await readFile(`db/migrations/${file}`,'utf8'));
+    for(const file of migrations.filter((n)=>n<'005')) await db.query(await readFile(`db/migrations/${file}`,'utf8'));
     const before=(await db.query('SELECT * FROM videos ORDER BY id')).rows;
     await db.query(await readFile('db/migrations/005_ads_tv_reporters.sql','utf8'));
     assert.deepEqual((await db.query('SELECT * FROM videos ORDER BY id')).rows,before,'Migration preserves existing video records');
+    for(const file of migrations.filter((n)=>n>'005_ads_tv_reporters.sql')) await db.query(await readFile(`db/migrations/${file}`,'utf8'));
+    assert.equal(await reporterMaintenance({source:'automatic'}),'unconfigured','No cleanup before editor accepts retention');
     const first=await saveAdvertisement({}, {clientName:'Client A',placement:'home',priority:10,startsAt:'2026-01-01',status:'published',headlineEn:'A'});
     await saveAdvertisement({}, {clientName:'Client B',placement:'article-end',priority:1,startsAt:'2026-01-01',status:'published',headlineEn:'B'});
     assert.equal((await getActiveAdvertisements({},'en')).length,2,'Lower priorities and other placements are included');
@@ -93,8 +95,39 @@ test('isolated local schema: migrations, ads, YouTube synchronization, reporter 
     await assert.rejects(uploadApplicationFile(correction.token,'photo',png));
     await reviewApplication(secondId,'reject','Test rejection','editor');
     await db.query("UPDATE reporter_applications SET finalized_at=now()-interval '200 days'");await db.query("UPDATE reporter_cards SET revoked_at=now()-interval '200 days'");
-    await reporterMaintenance();assert.ok((await application(id))?.purged_at);assert.ok((await application(secondId))?.purged_at);
+    assert.equal(await reporterMaintenance(),'succeeded');assert.ok((await application(id))?.purged_at);assert.ok((await application(secondId))?.purged_at);
     assert.equal((await db.query('SELECT * FROM reporter_files WHERE application_id IS NOT NULL AND deleted_at IS NULL')).rows.length,0);
+    assert.equal((await maintenanceState()).status,'succeeded');
+    assert.ok((await maintenanceState()).last_success_at);
+    assert.equal(await reporterMaintenance({source:'automatic'}),'not-due');
+    assert.equal(await reporterMaintenance({source:'manual',actor:'editor'}),'recent','Double click is throttled');
+    const lockClient=await db.connect();
+    try {
+      await lockClient.query("SELECT pg_advisory_lock(hashtext('np-reporter-maintenance'))");
+      assert.equal(await reporterMaintenance(),'busy','Scheduled/manual/CLI runs cannot overlap');
+    } finally {await lockClient.query("SELECT pg_advisory_unlock(hashtext('np-reporter-maintenance'))");lockClient.release();}
+    const orphanId=randomUUID(),orphanKey=`test/orphan/${orphanId}`;
+    memory.set(orphanKey,png);
+    await db.query("INSERT INTO reporter_files(id,kind,object_key,mime,byte_size,validated,created_at) VALUES($1,'identity',$2,'image/png',$3,true,now()-interval '2 days')",[orphanId,orphanKey,png.length]);
+    await db.query("UPDATE reporter_maintenance_state SET started_at=now()-interval '2 minutes',next_run_at=now()-interval '1 day'");
+    deleteFails=true;
+    assert.equal(await reporterMaintenance({source:'manual',actor:'editor'}),'failed');
+    assert.ok(memory.has(orphanKey));assert.equal((await maintenanceState()).status,'failed');
+    assert.ok(new Date((await maintenanceState()).next_run_at).getTime()>Date.now()+14*60000,'Failed run backs off');
+    deleteFails=false;
+    await db.query("UPDATE reporter_maintenance_state SET status='running',started_at=now()-interval '1 hour',next_run_at=now()-interval '1 hour'");
+    await db.query("UPDATE reporter_settings SET settings=jsonb_set(settings,'{enabled}','false')");
+    assert.equal(await reporterMaintenance({source:'automatic'}),'succeeded','Catch up after interruption even when registration is closed');
+    assert.ok(!memory.has(orphanKey));assert.ok((await maintenanceState()).scheduler_seen_at);
+    assert.equal(Number((await db.query('SELECT next_number FROM reporter_settings')).rows[0].next_number),100,'Cleanup never reuses reporter IDs');
+    for(let i=0;i<26;i++) {
+      const fileId=randomUUID(),key=`test/backlog/${fileId}`;memory.set(key,png);
+      await db.query("INSERT INTO reporter_files(id,kind,object_key,mime,byte_size,validated,created_at) VALUES($1,'identity',$2,'image/png',$3,true,now()-interval '2 days')",[fileId,key,png.length]);
+    }
+    assert.equal(await reporterMaintenance(),'partial','A backlog is processed in bounded batches');
+    assert.equal((await db.query("SELECT count(*) FROM reporter_files WHERE object_key LIKE 'test/backlog/%' AND deleted_at IS NULL")).rows[0].count,'1');
+    await db.query("UPDATE reporter_maintenance_state SET next_run_at=now()-interval '1 minute'");
+    assert.equal(await reporterMaintenance({source:'automatic'}),'succeeded','The next scheduled batch completes the remaining work');
   } finally {
     globalThis.fetch=originalFetch;S3Client.prototype.send=originalSend;
     await getDatabase()?.end();

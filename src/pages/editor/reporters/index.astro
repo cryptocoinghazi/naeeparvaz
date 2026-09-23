@@ -1,6 +1,17 @@
 ---
 import EditorLayout from '../../../layouts/EditorLayout.astro';
-import { listApplications } from '../../../lib/reporters';
+import { listApplications, reporterSettings } from '../../../lib/reporters';
+import { maintenanceState, type MaintenanceState } from '../../../lib/reporter-maintenance';
+import { reporterStorageReady } from '../../../lib/reporter-storage';
+let maintenance:MaintenanceState|undefined;
+try {maintenance=await maintenanceState();} catch { /* Forward migration may not yet be applied locally. */ }
+const settings=await reporterSettings();
+const configured=reporterStorageReady() && settings.retentionConfirmed;
+const formatDate=(value:Date|null|undefined) => value ? new Date(value).toLocaleString('en-IN',{timeZone:'Asia/Kolkata'})+' IST' : 'Not yet';
+const running=maintenance?.status==='running' && maintenance.started_at && Date.now()-new Date(maintenance.started_at).getTime()<5*60000;
+const schedulerSeen=maintenance?.scheduler_seen_at && Date.now()-new Date(maintenance.scheduler_seen_at).getTime()<5*60000;
+const messages:Record<string,string>={succeeded:'Maintenance completed.',partial:'This batch completed. More work remains; automatic maintenance will continue shortly.',failed:'Maintenance did not complete. Check private storage and database configuration. Automatic runs retry after 15 minutes.',busy:'Maintenance is already running. No second run was started.','not-due':'Maintenance is not due yet.',unconfigured:'Configure private reporter storage and confirm the retention policy first.',recent:'Maintenance was recently started. Wait one minute before running it again.',confirm:'Confirm the retention cleanup before starting.'};
+const message=messages[Astro.url.searchParams.get('maintenance') || ''];
 let applications:Awaited<ReturnType<typeof listApplications>>=[];
 let ready=true;
 const rawPage=Number(Astro.url.searchParams.get('page') || 1);
@@ -11,8 +22,20 @@ applications=applications.slice(0,50);
 ---
 <EditorLayout title="Reporter applications" description="Private review, payment verification and digital organizational IDs. No reporter publishing access is granted.">
 <a class="button" href="/editor/reporters/settings/">Registration settings & ID templates</a>
+{message && <p role="status">{message}</p>}
+<section class="admin-section"><h2>Reporter maintenance</h2>
+<p>Runs inside the existing web service daily at 3:00 AM IST. Missed runs catch up after restart; large backlogs continue in small batches. No separate paid job is needed.</p>
+<p>{schedulerSeen?'Automatic scheduler: running.':'No recent automatic check. Scheduling runs with the production npm start command, not the local development server.'}</p>
+{maintenance ? <><dl class="maintenance-details"><div><dt>Last result</dt><dd>{maintenance.status}{maintenance.source ? ` (${maintenance.source})` : ''}</dd></div><div><dt>Last started</dt><dd>{formatDate(maintenance.started_at)}</dd></div><div><dt>Last successful completion</dt><dd>{formatDate(maintenance.last_success_at)}</dd></div><div><dt>Next automatic check for due work</dt><dd>{formatDate(maintenance.next_run_at)}</dd></div></dl>
+{!configured && <p>Waiting for private storage and confirmed retention settings.</p>}
+<form class="admin-form" method="post" action="/api/editor/reporters/maintenance/">
+<label class="maintenance-confirm"><input type="checkbox" name="confirm" value="yes" required/> I understand this permanently removes only documents/profiles whose saved retention period has elapsed, expired previews and abandoned uploads. It can also send pending application emails.</label>
+<p>Active cards, unreviewed applications and reporter numbers are preserved. Deleted documents cannot be restored by the editor.</p>
+<button class="button button-outline" disabled={!configured || !!running}>Run maintenance now</button></form></> : <p>Maintenance tracking is unavailable. Apply migration 006 before running it.</p>}
+</section>
 {!ready && <p role="alert">Reporter tables are unavailable. Apply the local migration before testing.</p>}
 <section class="admin-section"><h2>Applications</h2><p>Page {page}. Evidence and cards are private.</p>
 {applications.length ? applications.map((app) => <article class="admin-ad-record"><h3><a href={`/editor/reporters/${app.id}/`}>{app.purged_at ? 'Removed profile' : app.profile.name}</a></h3><p>{app.status} · {new Date(app.created_at).toLocaleDateString('en-IN')} · {app.payment_verified?'Payment verified':'Payment not verified'}</p></article>) : <p>No applications yet.</p>}</section>
 <nav aria-label="Application pages">{page>1 && <a class="button button-outline" href={`?page=${page-1}`}>Previous</a>} {hasNext && <a class="button button-outline" href={`?page=${page+1}`}>Next</a>}</nav>
 </EditorLayout>
+<style>.maintenance-details{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem}.maintenance-details dt{font-weight:bold}.maintenance-details dd{margin:0}.maintenance-confirm{display:flex;align-items:flex-start;gap:.7rem}.maintenance-confirm input{width:20px;min-height:20px;height:20px;flex-shrink:0;margin-top:4px}</style>

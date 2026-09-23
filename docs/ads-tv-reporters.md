@@ -1,6 +1,6 @@
 # Ad slideshows, TV and reporter registration
 
-These features are local until explicitly approved for deployment. The existing production start command runs forward migrations; review `005_ads_tv_reporters.sql` before a future deployment. Do not invoke migration commands with a production DATABASE_URL during local testing.
+The existing production start command runs forward migrations; review pending migrations before deploying. Migration 006 adds maintenance scheduling state without changing application data or retention settings. Do not invoke migration commands with a production DATABASE_URL during local testing.
 
 ## Local review
 
@@ -15,12 +15,13 @@ npm run build
 npm run test:enhancements
 ENHANCEMENT_DB_TEST=1 npm run test:enhancements:db
 npm run test:enhancements:browser
+node --env-file=.env tests/enhancements/startup.mjs
 node --import tsx scripts/preview-reporter-card.ts
 ```
 
 Run migrations only after confirming `.env` points to the local compose database. Existing articles, videos and credentials are untouched. The unrelated `public/images/ads` artwork is not part of this implementation.
 
-The database/browser tests refuse non-local or non-development database credentials, create their own randomly named schemas, and remove only those schemas on completion. Storage/email/YouTube are mocked or blocked. The browser checks use only 1440px and 390px on changed pages, and generate screenshots under `test-results/enhancements/`. The card-preview command uses a blank placeholder portrait and issues no actual ID.
+The database/browser/startup tests refuse non-local or non-development database credentials, create their own randomly named schemas, and remove only those schemas on completion. Storage/email/YouTube are mocked, blocked or disabled. The startup test checks the real production entry point, migration and automatic scheduler heartbeat without visitor traffic. The browser checks use only 1440px and 390px on changed pages, and generate screenshots under `test-results/enhancements/`. The card-preview command uses a blank placeholder portrait and issues no actual ID.
 
 ## Advertisement desk
 
@@ -77,7 +78,17 @@ Cards expire on the first anniversary (February 29 → February 28 where necessa
 
 Emails use a recorded outbox and a stable provider idempotency key. Confirmed failures can be retried; ambiguous responses are marked unknown and require checking provider records. Approval email contains only the generated ID PDF, never identity/payment evidence. Retrying delivery does not allocate a new reporter number.
 
-Schedule `npm run reporters:maintenance` daily (or more often). It removes expired preview files, abandoned uploads after one day, expired correction tokens and rate-limit records, then delivers pending emails. No automatic retry is made for ambiguous sends.
+Reporter maintenance now runs **inside the existing web service**, started by `npm start` after migrations and server startup. No separate DigitalOcean job, worker, scheduler service or new credentials are required. Do not create the previously proposed paid reporter-maintenance component. The YouTube synchronization command remains separate and is unchanged by this maintenance update.
+
+The service checks once a minute, starting 30 seconds after startup. It targets **03:00 Asia/Kolkata daily**, catches up when the saved due time has passed, and persists the last result/next run in PostgreSQL. Private reporter storage and the editor's retention confirmation are required. Closing applications does not stop retention cleanup. There is no automatic timer in `npm run dev` or when starting `dist/server/entry.mjs` directly; use the existing `npm start` production command.
+
+At `/editor/reporters/`, editors can see scheduler heartbeat, last run/result, last success and next due time. **Run maintenance now** requires explicit confirmation because deletions are irreversible and pending emails may be delivered. Editor authentication and same-origin protection apply. A database advisory lock prevents concurrent manual, CLI and automatic runs, including during rolling deployments. Manual clicks have a one-minute cooldown.
+
+Runs use small batches and a 15-second work budget checked between operations. An in-flight storage request or email can take additional time. Private deletes have a five-second timeout. Backlogs continue after one minute, failures retry after 15 minutes, and interrupted runs resume after restart. Unknown email outcomes are never automatically resent. Existing pending/failed/unknown email statuses remain visible per application.
+
+The existing `npm run reporters:maintenance` command remains available for manual operations. It removes expired preview files, abandoned uploads after one day, expired correction tokens and rate-limit records, then delivers pending emails. It follows the same database lock, readiness checks and status tracking as the editor and scheduler.
+
+No additional infrastructure charge is introduced; the scheduler shares the site's existing CPU/database connections. R2 operations/storage and email still follow their existing usage allowances. This is not an independent always-on scheduler: if the whole web app is down, maintenance waits until it restarts. Monitor the editor heartbeat and last successful run.
 
 Default retention is 90 days after final review for evidence, and 90 days after expiry/revocation for the approved profile/photo/card. Rejected profiles are removed after their configured retention window. A minimal number/status/audit record remains to prevent ID reuse; personal notes and email bodies are cleared on profile removal. Settings are snapshotted per application, so subsequent changes do not silently alter an applicant's terms. Unreviewed applications need editorial attention; the system does not silently reject them.
 
