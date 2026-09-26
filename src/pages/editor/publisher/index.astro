@@ -20,6 +20,7 @@ const statusNames: Record<PublishTargetStatus, string> = {
   pending: "Pending", submitting: "Submitting", scheduled: "Scheduled", published: "Published",
   failed: "Failed", cancelled: "Cancelled", ambiguous: "Needs review",
 };
+const batchStatusNames = { ...statusNames, partial: 'Mixed results' };
 const formatDate = (value?: string) => value ? new Intl.DateTimeFormat("en-IN", {
   dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kolkata",
 }).format(new Date(value)) : "—";
@@ -38,7 +39,7 @@ const usableChannel = (platform: SocialPlatform) => channels.find((channel) => c
   </head>
   <body class="admin-body">
     <a class="skip-link" href="#admin-content">Skip to publisher</a>
-    <AdminHeader kicker="Protected publishing desk" title="Social video publisher" description="Upload one verified short video, review the copy, then publish now or schedule it across your connected social channels." />
+    <AdminHeader kicker="Protected publishing desk" title="Social media posts" description="Upload a video, review the text, then post now or choose a time for your connected social accounts." />
 
     <main id="admin-content" class="admin-container admin-main">
       {saved && <p class="admin-notice admin-notice-success" role="status">Publisher action completed. Review each platform status below.</p>}
@@ -51,7 +52,7 @@ const usableChannel = (platform: SocialPlatform) => channels.find((channel) => c
         </div>
         <div class="publisher-readiness" aria-label="Publisher configuration status">
           <p><span class:list={["publisher-dot", bufferReady && "is-ready"]}></span> Social publishing {bufferReady ? "configured" : "not configured"}</p>
-          <p><span class:list={["publisher-dot", storageReady && "is-ready"]}></span> R2 storage and media URL {storageReady ? "configured" : "not configured"}</p>
+          <p><span class:list={["publisher-dot", storageReady && "is-ready"]}></span> Video storage and delivery {storageReady ? "configured" : "not configured"}</p>
         </div>
         <div class="publisher-channel-summary">
           {socialPlatforms.map((platform) => {
@@ -73,7 +74,7 @@ const usableChannel = (platform: SocialPlatform) => channels.find((channel) => c
 
       <section class="admin-section" aria-labelledby="new-publish-heading">
         <div class="admin-section-heading">
-          <div><p class="kicker">New publishing batch</p><h2 id="new-publish-heading">Upload and prepare</h2></div>
+          <div><p class="kicker">New post</p><h2 id="new-publish-heading">Upload and prepare</h2></div>
           <p>Accepted: MP4, H.264 + AAC, portrait, square or landscape, 3 seconds–15 minutes and no more than 90 MB. Each social platform may apply additional limits.</p>
         </div>
         {(!bufferReady || !storageReady || !channels.length) && <p class="admin-notice admin-notice-error">Complete the provider configuration and select at least one usable channel before publishing.</p>}
@@ -81,7 +82,7 @@ const usableChannel = (platform: SocialPlatform) => channels.find((channel) => c
           <label for="publisher-file"><strong>One MP4 video</strong><input id="publisher-file" type="file" accept="video/mp4,.mp4" /></label>
           <button class="button" id="upload-video" type="button" disabled={!storageReady}>Upload and validate video</button>
           <progress id="upload-progress" max="100" value="0" hidden>0%</progress>
-          <p id="upload-message" class="admin-help" aria-live="polite">The video is uploaded directly from this browser to private R2 storage.</p>
+          <p id="upload-message" class="admin-help" aria-live="polite">Your video is uploaded to private storage before it is checked.</p>
         </div>
 
         <form class="admin-form" id="publisher-form" method="post" action="/api/editor/publisher/publish/">
@@ -124,14 +125,14 @@ const usableChannel = (platform: SocialPlatform) => channels.find((channel) => c
 
       <section class="admin-section" aria-labelledby="publish-history-heading">
         <div class="admin-section-heading">
-          <div><p class="kicker">Publishing history</p><h2 id="publish-history-heading">Batches and target status</h2></div>
-          <p>Refresh checks the latest status for submitted posts. Retry is available only after a target is confirmed as failed.</p>
+          <div><p class="kicker">Publishing history</p><h2 id="publish-history-heading">Posting history</h2></div>
+          <p>Check the latest result for each social account. Try again is available only when a post is confirmed as failed.</p>
         </div>
         {batches.length ? <div class="publisher-batch-list">{batches.map((batch) => (
           <article class="publisher-batch" id={`batch-${batch.id}`}>
-            <header><div><span class={`admin-status publisher-state-${batch.state}`}>{batch.state}</span><h3>{batch.youtubeTitle || batch.sharedText.slice(0, 90)}</h3></div><form method="post" action="/api/editor/publisher/target/"><input type="hidden" name="batchId" value={batch.id} /><input type="hidden" name="action" value="refresh" /><button class="button button-outline">Refresh status</button></form></header>
+            <header><div><span class={`admin-status publisher-state-${batch.state}`}>{batchStatusNames[batch.state]}</span><h3>{batch.youtubeTitle || batch.sharedText.slice(0, 90)}</h3></div><form method="post" action="/api/editor/publisher/target/"><input type="hidden" name="batchId" value={batch.id} /><input type="hidden" name="action" value="refresh" /><button class="button button-outline">Check status</button></form></header>
             <dl class="publisher-metadata"><div><dt>Video</dt><dd>{batch.asset.originalFilename}</dd></div><div><dt>Timing</dt><dd>{batch.publishMode === "scheduled" ? formatDate(batch.scheduledFor) : "Publish now"}</dd></div><div><dt>Created</dt><dd>{formatDate(batch.createdAt)}</dd></div></dl>
-            {(["failed", "cancelled"].includes(batch.state) && batch.asset.status === "validated") && <form class="publisher-discard-form" method="post" action="/api/editor/publisher/target/"><input type="hidden" name="batchId" value={batch.id} /><input type="hidden" name="action" value="discard" /><button class="button button-outline">Discard failed/cancelled video</button></form>}
+            {(["failed", "cancelled"].includes(batch.state) && batch.asset.status === "validated") && <form class="publisher-discard-form" method="post" action="/api/editor/publisher/target/"><input type="hidden" name="batchId" value={batch.id} /><input type="hidden" name="action" value="discard" /><button class="button button-outline">Remove failed or cancelled video</button></form>}
             <div class="publisher-target-list">{batch.targets.map((target) => (
               <section class="publisher-target">
                 <div><strong>{platformNames[target.platform]}</strong><span class={`admin-status publisher-target-${target.status}`}>{statusNames[target.status]}</span></div>
@@ -139,9 +140,9 @@ const usableChannel = (platform: SocialPlatform) => channels.find((channel) => c
                 {target.errorMessage && <p class="publisher-error">{displayTargetError(target.errorMessage)}</p>}
                 <div class="admin-actions">
                   {target.status === "scheduled" && <form method="post" action="/api/editor/publisher/target/"><input type="hidden" name="batchId" value={batch.id} /><input type="hidden" name="platform" value={target.platform} /><input type="hidden" name="action" value="cancel" /><button class="button button-outline">Cancel scheduled post</button></form>}
-                  {target.status === "failed" && <form method="post" action="/api/editor/publisher/target/"><input type="hidden" name="batchId" value={batch.id} /><input type="hidden" name="platform" value={target.platform} /><input type="hidden" name="action" value="retry" /><button class="button button-outline">Retry confirmed failure</button></form>}
+                  {target.status === "failed" && <form method="post" action="/api/editor/publisher/target/"><input type="hidden" name="batchId" value={batch.id} /><input type="hidden" name="platform" value={target.platform} /><input type="hidden" name="action" value="retry" /><button class="button button-outline">Try again</button></form>}
                 </div>
-                {target.status === "published" && target.publishedUrl && <form class="publisher-import" method="get" action="/editor/#new-video"><input type="hidden" name="publisherBatch" value={batch.id} /><input type="hidden" name="publisherPlatform" value={target.platform} /><button class="button button-outline">Add to website video library</button><p class="admin-help">Opens the existing form with this platform URL and available copy prefilled. No record is created automatically.</p></form>}
+                {target.status === "published" && target.publishedUrl && <form class="publisher-import" method="get" action="/editor/#new-video"><input type="hidden" name="publisherBatch" value={batch.id} /><input type="hidden" name="publisherPlatform" value={target.platform} /><button class="button button-outline">Add to website video library</button><p class="admin-help">Opens the video form with this link and available text filled in. Nothing is added until you save.</p></form>}
               </section>
             ))}</div>
           </article>
@@ -214,8 +215,8 @@ const usableChannel = (platform: SocialPlatform) => channels.find((channel) => c
         request.upload.addEventListener("progress", (event) => {
           if (event.lengthComputable && uploadProgress instanceof HTMLProgressElement) uploadProgress.value = Math.round(event.loaded / event.total * 100);
         });
-        request.addEventListener("load", () => request.status >= 200 && request.status < 300 ? resolve(undefined) : reject(new Error("R2 rejected the upload.")));
-        request.addEventListener("error", () => reject(new Error("The direct R2 upload was interrupted.")));
+        request.addEventListener("load", () => request.status >= 200 && request.status < 300 ? resolve(undefined) : reject(new Error("Video storage could not accept the upload.")));
+        request.addEventListener("error", () => reject(new Error("The video upload was interrupted.")));
         request.send(file);
       });
       uploadButton?.addEventListener("click", async () => {
@@ -226,11 +227,11 @@ const usableChannel = (platform: SocialPlatform) => channels.find((channel) => c
         if (uploadProgress instanceof HTMLProgressElement) { uploadProgress.hidden = false; uploadProgress.value = 0; }
         let assetId;
         try {
-          if (uploadMessage) uploadMessage.textContent = "Creating a secure direct-upload URL…";
+          if (uploadMessage) uploadMessage.textContent = "Preparing your secure video upload…";
           const created = await requestJson({ action: "create", filename: file.name, mimeType: file.type, byteSize: file.size });
           if (!created.assetId || !created.uploadUrl) throw new Error("The server returned an incomplete upload request.");
           assetId = created.assetId;
-          if (uploadMessage) uploadMessage.textContent = "Uploading directly to private R2 storage…";
+          if (uploadMessage) uploadMessage.textContent = "Uploading your video to private storage…";
           await uploadToR2(created.uploadUrl, file);
           if (uploadMessage) uploadMessage.textContent = "Checking codec, audio, dimensions and duration…";
           const completed = await requestJson({ action: "complete", assetId });

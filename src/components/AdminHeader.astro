@@ -1,32 +1,46 @@
 ---
-interface Props {
-  kicker: string;
-  title: string;
-  description?: string;
-}
-const { kicker, title, description } = Astro.props;
+import '../styles/editor-workspace.css';
+interface Props { kicker: string; title: string; description?: string }
+const { title, description } = Astro.props;
+const path = Astro.url.pathname;
+const groups = [
+  { label: 'Workspace', links: [
+    { label: 'News articles', href: '/editor/articles/', icon: 'M6 3h9l4 4v14H6z M14 3v5h5 M9 12h7 M9 16h7' },
+    { label: 'Website videos', href: '/editor/#website-videos', icon: 'M4 4h16v16H4z M10 8l6 4-6 4z' },
+    { label: 'Social media posts', href: '/editor/publisher/', icon: 'M16 3a3 3 0 1 0 0 6 3 3 0 0 0 0-6 M6 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6 M16 15a3 3 0 1 0 0 6 3 3 0 0 0 0-6 M9 10l4-3 M9 14l4 3' },
+    { label: 'Advertisements', href: '/editor/ads/', icon: 'M3 9v6h5l11 5V4L8 9z M8 15l2 6 M22 9v6' },
+    { label: 'Naee Parvaz TV', href: '/editor/tv/', icon: 'M3 4h18v14H3z M8 22h8 M12 18v4' },
+  ] },
+  { label: 'Reporters', links: [
+    { label: 'Applications', href: '/editor/reporters/', icon: 'M7 4h13v17H7z M4 1h13 M10 9h7 M10 13h7 M10 17h4' },
+    { label: 'Settings', href: '/editor/reporters/settings/', icon: 'M4 7h16 M4 17h16 M8 4v6 M16 14v6' },
+  ] },
+  { label: 'Website', links: [
+    { label: 'Website visits', href: '/editor/analytics/', icon: 'M4 12h3v9H4z M11 3h3v18h-3z M18 8h3v13h-3z' },
+    { label: 'Website settings', href: '/editor/#website-settings', icon: 'M3 4h18v16H3z M3 9h18 M8 9v11' },
+  ] },
+];
+const isActive = (href: string) => href.includes('#')
+  ? path === '/editor/' && href.endsWith('website-settings')
+  : href === '/editor/reporters/'
+    ? path.startsWith(href) && !path.startsWith('/editor/reporters/settings/')
+    : path.startsWith(href);
+const activeGroup = groups.find(group => group.links.some(link => isActive(link.href)))?.label || 'Workspace';
 ---
 
-<header class="admin-header">
-  <div class="admin-container admin-header-inner">
-    <div>
-      <p class="kicker">{kicker}</p>
-      <h1>{title}</h1>
-      {description && <p>{description}</p>}
-      <p>Signed in as <strong>{Astro.locals.adminEmail}</strong></p>
-    </div>
-    <nav aria-label="Editor sections">
-      <a class="button button-light" href="/en/" target="_blank" rel="noopener">View website</a>
-      <a class="button button-outline admin-button-outline" href="/editor/">Settings & videos</a>
-      <a class="button button-outline admin-button-outline" href="/editor/articles/">Articles</a>
-      <a class="button button-outline admin-button-outline" href="/editor/ads/">Advertisements</a>
-      <a class="button button-outline admin-button-outline" href="/editor/analytics/">Analytics</a>
-      <a class="button button-outline admin-button-outline" href="/editor/publisher/">Social publisher</a>
-      <a class="button button-outline admin-button-outline" href="/editor/tv/">Naee Parvaz TV</a>
-      <a class="button button-outline admin-button-outline" href="/editor/reporters/">Reporters</a>
-      <form class="admin-logout-form" method="post" action="/api/auth/logout/">
-        <button class="button button-outline admin-button-outline" type="submit">Sign out</button>
-      </form>
-    </nav>
-  </div>
+<aside class="editor-sidebar" id="editor-sidebar" aria-label="Editor menu">
+  <div class="editor-brand"><span id="editor-menu-title">NAEE PARVAZ</span><small>Editor workspace</small><button type="button" class="editor-menu-close" aria-label="Close menu" hidden>×</button></div>
+  <nav aria-label="Editor sections">
+    {groups.map(group => <div class="editor-nav-group"><p>{group.label}</p>{group.links.map(link =>
+      <a href={link.href} aria-current={isActive(link.href) ? 'page' : undefined} data-editor-nav>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={link.icon}/></svg><span>{link.label}</span>
+      </a>)}</div>)}
+  </nav>
+  <div class="editor-account"><span>Signed in as editor</span><small>{Astro.locals.adminEmail}</small><form method="post" action="/api/auth/logout/"><button type="submit">Sign out <span aria-hidden="true">↗</span></button></form></div>
+</aside>
+<div class="editor-menu-backdrop" hidden></div>
+<header class="editor-header">
+  <div class="editor-topbar"><button type="button" class="editor-menu-toggle" aria-expanded="false" aria-controls="editor-sidebar" hidden><span aria-hidden="true">☰</span> Menu</button><span class="editor-mobile-brand">NAEE PARVAZ</span><span class="editor-breadcrumb">{activeGroup} <span aria-hidden="true">/</span> <span data-editor-title>{title}</span></span><a href="/en/" target="_blank" rel="noopener" aria-label="View website (opens in a new tab)"><span class="editor-website-label">View website</span> <span aria-hidden="true">↗</span></a></div>
+  <div class="editor-page-heading"><h1 data-editor-title>{title}</h1>{description && <p>{description}</p>}</div>
 </header>
+<script>import '../scripts/editor-workspace';</script>

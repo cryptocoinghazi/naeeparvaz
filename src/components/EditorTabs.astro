@@ -1,0 +1,8 @@
+---
+interface Props { label: string; tabs: { id: string; label: string }[]; defaultTab?: string }
+const { label, tabs, defaultTab = tabs[0]?.id } = Astro.props;
+---
+<nav class="editor-tab-links" aria-label={label} data-editor-tab-list data-default-tab={defaultTab}>
+  {tabs.map(tab => <a href={`#${tab.id}`} id={`tab-${tab.id}`} data-editor-tab>{tab.label}</a>)}
+</nav>
+<script>import '../scripts/editor-tabs';</script>

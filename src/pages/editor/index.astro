@@ -1,5 +1,7 @@
 ---
 import AdminLabelFields from "../../components/AdminLabelFields.astro";
+import AdminHeader from "../../components/AdminHeader.astro";
+import EditorTabs from "../../components/EditorTabs.astro";
 import { getContentLabels } from "../../lib/label-repository";
 import { getPublishBatch } from "../../lib/publisher-repository";
 import { getSiteSettings, getSocialLinks, socialPlatformLabels } from "../../lib/site-repository";
@@ -15,6 +17,7 @@ const videos = await getAdminVideos(Astro.locals);
 const labels = await getContentLabels(Astro.locals);
 const saved = Astro.url.searchParams.get("saved");
 const error = Astro.url.searchParams.get("error");
+const initialTab = ['video', 'status'].includes(saved || error || '') || Astro.url.searchParams.has('publisherBatch') ? 'website-videos' : 'website-settings';
 const publisherBatchId = Astro.url.searchParams.get("publisherBatch");
 const publisherPlatformValue = Astro.url.searchParams.get("publisherPlatform");
 const publisherBatch = publisherBatchId && /^[0-9a-f-]{36}$/i.test(publisherBatchId) ? await getPublishBatch(Astro.locals, publisherBatchId) : undefined;
@@ -44,36 +47,20 @@ const today = new Intl.DateTimeFormat("en-CA", {
   </head>
   <body class="admin-body">
     <a class="skip-link" href="#admin-content">Skip to editor</a>
-    <header class="admin-header">
-      <div class="admin-container admin-header-inner">
-        <div>
-          <p class="kicker">Protected website editor</p>
-          <h1>Naee Parvaz control desk</h1>
-          <p>Signed in as <strong>{Astro.locals.adminEmail}</strong></p>
-        </div>
-        <nav aria-label="Admin shortcuts">
-          <a class="button button-light" href="/en/" target="_blank" rel="noopener">View website</a>
-          <a class="button button-outline admin-button-outline" href="/editor/articles/">Articles</a>
-          <a class="button button-outline admin-button-outline" href="/editor/ads/">Advertisements</a>
-          <a class="button button-outline admin-button-outline" href="/editor/analytics/">Analytics</a>
-          <a class="button button-outline admin-button-outline" href="/editor/publisher/">Social publisher</a>
-          <a class="button button-outline admin-button-outline" href="#new-video">Add video</a>
-          <form class="admin-logout-form" method="post" action="/api/auth/logout/">
-            <button class="button button-outline admin-button-outline" type="submit">Sign out</button>
-          </form>
-        </nav>
-      </div>
-    </header>
+    <AdminHeader kicker="Editor workspace" title={initialTab === 'website-videos' ? 'Website videos' : 'Website settings'} description="Manage your website details and video library. Save each section when you finish editing." />
 
     <main id="admin-content" class="admin-container admin-main">
       {saved && <p class="admin-notice admin-notice-success" role="status">Changes saved successfully.</p>}
-      {error && <p class="admin-notice admin-notice-error" role="alert">The update could not be saved. Check every field and confirm PostgreSQL is available.</p>}
+      {error && <p class="admin-notice admin-notice-error" role="alert">The update could not be saved. Check the fields and try again. If this continues, contact your website administrator.</p>}
       {publisherPrefill && <p class="admin-notice admin-notice-success" role="status">The published social link and available copy are prefilled below. Add bilingual editorial details, review the labels, then save one website-library draft.</p>}
 
+      <div data-editor-tabs>
+      <EditorTabs label="Website sections" defaultTab={initialTab} tabs={[{id:'website-settings',label:'Website settings'},{id:'website-videos',label:'Website videos'}]}/>
+      <div id="website-settings">
       <section class="admin-section" aria-labelledby="contact-settings-heading">
         <div class="admin-section-heading">
           <div><p class="kicker">Contact details</p><h2 id="contact-settings-heading">Editor and newsroom</h2></div>
-          <p>These values update the header, contact page, footer, email recipient and organization metadata.</p>
+          <p>These details appear across the website and decide where contact emails are sent.</p>
         </div>
         <form class="admin-form" method="post" action="/api/editor/settings/">
           <input type="hidden" name="section" value="contact" />
@@ -90,8 +77,8 @@ const today = new Intl.DateTimeFormat("en-CA", {
 
       <section class="admin-section" aria-labelledby="social-settings-heading">
         <div class="admin-section-heading">
-          <div><p class="kicker">Social identities</p><h2 id="social-settings-heading">Profiles and links</h2></div>
-          <p>An identity can be displayed without a link. Only verified HTTPS URLs on the matching platform are accepted.</p>
+          <div><p class="kicker">Social accounts</p><h2 id="social-settings-heading">Profiles and links</h2></div>
+          <p>You can show an account name without a link. Links must use https:// and belong to the selected social website.</p>
         </div>
         <form class="admin-form" method="post" action="/api/editor/settings/">
           <input type="hidden" name="section" value="social" />
@@ -100,11 +87,11 @@ const today = new Intl.DateTimeFormat("en-CA", {
               <fieldset>
                 <legend>{socialPlatformLabels[social.platform]}</legend>
                 <label>
-                  Display identity
+                  Account name
                   <input name={`${social.platform}Identity`} required maxlength="100" value={social.identity} />
                 </label>
                 <label>
-                  Exact profile URL (optional)
+                  Profile link (optional)
                   <input name={`${social.platform}Url`} type="url" inputmode="url" maxlength="500" value={social.url ?? ""} placeholder="https://…" />
                 </label>
                 <label class="admin-check"><input name={`${social.platform}Enabled`} type="checkbox" checked={social.enabled} /> Show on website</label>
@@ -115,10 +102,12 @@ const today = new Intl.DateTimeFormat("en-CA", {
         </form>
       </section>
 
+      </div>
+      <div id="website-videos">
       <section class="admin-section" id="new-video" aria-labelledby="new-video-heading">
         <div class="admin-section-heading">
           <div><p class="kicker">Video desk</p><h2 id="new-video-heading">Add a video</h2></div>
-          <p>Paste a public YouTube, Instagram or Facebook video link. The website stores only the link and editorial metadata.</p>
+          <p>Paste a public YouTube, Instagram or Facebook video link. This adds its link and description, not a copy of the video.</p>
         </div>
         <form class="admin-form" method="post" action="/api/editor/videos/">
           <div class="admin-form-grid">
@@ -133,7 +122,7 @@ const today = new Intl.DateTimeFormat("en-CA", {
             <label>Status<select name="status"><option value="draft">Draft</option><option value="published">Published</option></select></label>
             <label class="admin-check admin-check-bottom"><input name="featured" type="checkbox" /> Feature this video</label>
           </div>
-          <p class="admin-help">At least one title is required. If the other language is empty, the available title is used as a transparent fallback.</p>
+          <p class="admin-help">Enter at least one title. If a translation is missing, visitors will see the title in the available language.</p>
           <button class="button" type="submit">Add video</button>
         </form>
       </section>
@@ -187,6 +176,8 @@ const today = new Intl.DateTimeFormat("en-CA", {
           <p class="admin-empty">No video records yet. Add the first link above as a draft, review it, then publish it.</p>
         )}
       </section>
+      </div>
+      </div>
     </main>
   </body>
 </html>

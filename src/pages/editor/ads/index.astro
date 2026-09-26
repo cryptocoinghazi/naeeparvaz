@@ -7,12 +7,12 @@ import '../../../styles/admin.css';
 const advertisements = await getAdminAdvertisements(Astro.locals);
 ---
 <!doctype html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><meta name="robots" content="noindex,nofollow"/><title>Advertisements | Naee Parvaz</title></head>
-<body class="admin-body"><AdminHeader kicker="Commercial desk" title="Advertisement slideshows" description="All active campaigns appear in every existing ad space. Priority controls order, not exclusion." />
+<body class="admin-body"><AdminHeader kicker="Commercial desk" title="Advertisements" description="Every active advertisement appears in each ad space. Display order decides which appears first." />
 <main class="admin-container admin-main">
 {Astro.url.searchParams.has('saved') && <p role="status">Changes saved.</p>}
 {Astro.url.searchParams.has('error') && <p role="alert">Unable to save. Check the schedule, confirmation, image and required fields.</p>}
 <section class="admin-section"><h2>Create advertisement</h2><AdvertisementEditorForm /></section>
-<section class="admin-section"><h2>Campaigns</h2>{advertisements.map((ad) => <details class="admin-ad-record"><summary><strong>{ad.clientName}</strong> — {advertisementState(ad)} · priority {ad.priority}</summary><div class="admin-ad-record-body">
+<section class="admin-section"><h2>Your advertisements</h2>{advertisements.map((ad) => <details class="admin-ad-record"><summary><strong>{ad.clientName}</strong> — {advertisementState(ad)} · display order {ad.priority}</summary><div class="admin-ad-record-body">
 {!ad.deletedAt && <><AdvertisementEditorForm advertisement={ad}/><form method="post" action="/api/editor/ad-status/"><input type="hidden" name="id" value={ad.id}/><input type="hidden" name="status" value={ad.status === 'published' ? 'draft' : 'published'}/><button class="button" type="submit">{ad.status === 'published' ? 'Disable' : 'Publish'}</button></form></>}
 <form method="post" action="/api/editor/ad-status/" class="admin-form"><input type="hidden" name="id" value={ad.id}/><input type="hidden" name="status" value={ad.deletedAt ? 'restore' : 'delete'}/>{!ad.deletedAt && <label><input type="checkbox" name="confirm" value="yes" required/> Confirm removal from all ad spaces (recoverable)</label>}<button class="button button-outline" type="submit">{ad.deletedAt ? 'Restore as draft' : 'Delete advertisement'}</button></form>
 </div></details>)}</section></main></body></html>

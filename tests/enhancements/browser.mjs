@@ -6,6 +6,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import pg from 'pg';
 import { chromium } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { checkEditorWorkspace } from './editor-workspace.mjs';
 
 const url=new URL(process.env.DATABASE_URL || '');
 assert.ok(['127.0.0.1','localhost'].includes(url.hostname) && url.username==='naee' && url.password==='local-development-only' && url.pathname==='/naee_parvaz','Local compose database required');
@@ -25,6 +26,9 @@ try {
   const settings={enabled:true,fee:100,payee:'Test recipient',instructionsEn:'Test instructions',instructionsHi:'परीक्षण निर्देश',refundEn:'Test refund policy',refundHi:'परीक्षण वापसी नीति',evidenceDays:90,profileDays:90,retentionConfirmed:true};
   await scoped.query('UPDATE reporter_settings SET settings=$1,next_number=100',[settings]);
   const appId=randomUUID();
+  const articleId=randomUUID();
+  await scoped.query("INSERT INTO articles(id,slug,byline,published_at) VALUES($1,'workspace-test-article','Test editor',now())",[articleId]);
+  await scoped.query("INSERT INTO article_translations(article_id,locale,title,summary,body_markdown) VALUES($1,'en','Workspace test article','Preview check','Local test article body')",[articleId]);
   await scoped.query("INSERT INTO reporter_applications(id,locale,profile,payment_terms) VALUES($1,'en',$2,$3)",[appId,{name:'Test Applicant',email:'test@example.invalid',phone:'9999999999',address:'Test address',area:'Yavatmal',languages:'Hindi',education:'Graduate',experience:'None',identityType:'voter-id',transaction:'TEST-123',paymentDate:'2026-01-01',workSamples:''},settings]);
   const session=randomBytes(32).toString('base64url');
   await scoped.query("INSERT INTO admin_sessions(token_hash,email,expires_at) VALUES($1,$2,now()+interval '1 hour')",[createHash('sha256').update(session).digest('hex'),process.env.ADMIN_EMAIL]);
@@ -38,7 +42,7 @@ try {
   }
   browser=await chromium.launch({headless:true});
   await mkdir('test-results/enhancements',{recursive:true});
-  for(const viewport of [{width:1440,height:1000},{width:390,height:844}]) {
+  for(const viewport of [{width:1440,height:1000},{width:820,height:1000},{width:390,height:844}]) {
     const context=await browser.newContext({viewport});
     await context.addCookies([{name:'__Host-naee_admin',value:session,url:'https://127.0.0.1/',secure:true,httpOnly:true,sameSite:'Lax'}]);
     await context.route('**/*',async route=>{
@@ -62,14 +66,17 @@ try {
     const page=await context.newPage();
     page.setDefaultTimeout(15000);
     const errors=[];page.on('pageerror',error=>errors.push(error.message));
-    for(const path of ['/en/videos/','/hi/videos/','/en/join/','/hi/join/','/editor/ads/','/editor/tv/','/editor/reporters/','/editor/reporters/settings/',`/editor/reporters/${appId}/`]) {
+    await checkEditorWorkspace(page,base,viewport);
+    for(const path of ['/en/videos/','/hi/videos/','/en/join/','/hi/join/','/editor/','/editor/articles/','/editor/articles/new/',`/editor/articles/${articleId}/`,`/editor/articles/${articleId}/preview/`,'/editor/analytics/','/editor/publisher/','/editor/ads/','/editor/tv/','/editor/reporters/','/editor/reporters/settings/',`/editor/reporters/${appId}/`]) {
       console.log(`Checking ${viewport.width}px ${path}`);
       const response=await page.goto(base+path);assert.ok(response?.ok(),path);
       assert.equal(new URL(page.url()).pathname,path,`${path}: must not redirect to login`);
+      if(!path.startsWith('/editor/') || path.endsWith('/preview/')) assert.equal(await page.locator('.editor-sidebar').count(),0,'Public pages and article previews keep their existing layout');
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),`${path}: no horizontal overflow at ${viewport.width}`);
       const results=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();
       assert.deepEqual(results.violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)})),[],`${path}: accessibility`);
       if(path==='/editor/reporters/settings/' && viewport.width===1440) {
+        await page.getByRole('tab',{name:'Reporter policy',exact:true}).click();
         const policyEndpoint=base+'/api/editor/reporters/policy/';
         const forbidden=await fetch(policyEndpoint,{method:'POST',headers:{Origin:'https://untrusted.invalid',Cookie:`__Host-naee_admin=${session}`,'Content-Type':'application/x-www-form-urlencoded'},body:'action=publish&revision=1&confirm=yes',redirect:'manual'});
         assert.ok(forbidden.status===403 || forbidden.headers.get('location')?.includes('policyError'));
@@ -95,7 +102,7 @@ try {
         assert.ok(crossOrigin.status===403 || crossOrigin.headers.get('location')?.includes('maintenance=failed'));
         assert.equal((await scoped.query('SELECT status FROM reporter_maintenance_state')).rows[0].status,'idle');
         await page.locator('form[action="/api/editor/reporters/maintenance/"] input[name="confirm"]').check();
-        await page.getByRole('button',{name:'Run maintenance now'}).click();
+        await page.getByRole('button',{name:'Run cleanup now'}).click();
         await page.waitForURL(url=>url.searchParams.get('maintenance')==='succeeded',{waitUntil:'domcontentloaded'});
         assert.equal((await scoped.query('SELECT status FROM reporter_maintenance_state')).rows[0].status,'succeeded');
       }
@@ -183,6 +190,16 @@ try {
     assert.deepEqual(errors,[],'No browser script exceptions');
     await context.close();
   }
+  const noJs=await browser.newContext({javaScriptEnabled:false,viewport:{width:390,height:844}});
+  await noJs.route('**/*',async route=>{
+    if(new URL(route.request().url()).origin!==base) return route.abort();
+    const response=await route.fetch({headers:{...route.request().headers(),cookie:`__Host-naee_admin=${session}`},maxRedirects:0});
+    return route.fulfill({response});
+  });
+  const fallback=await noJs.newPage();await fallback.goto(base+'/editor/reporters/settings/');
+  for(const id of ['reporter-payment-settings','reporter-card-design','reporter-policy-settings']) assert.equal(await fallback.locator('#'+id).isVisible(),true,'Settings remain available without JavaScript');
+  assert.equal(await fallback.locator('[data-editor-nav]').first().isVisible(),true);
+  await noJs.close();
   console.log('Focused desktop/mobile checks passed: changed routes, authorization, slides, playback queue, application form, overflow and accessibility.');
 } finally {
   await browser?.close();

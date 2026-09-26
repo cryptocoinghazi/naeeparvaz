@@ -22,22 +22,22 @@ const startsAt = inputDateTime(advertisement?.startsAt) || inputDateTime(new Dat
   {advertisement && <input type="hidden" name="id" value={advertisement.id} />}
   <div class="admin-form-grid">
     <label>Client name<input name="clientName" required minlength="2" maxlength="160" value={advertisement?.clientName ?? ""} /></label>
-    <label>Original placement (reference only; runs in all ad spaces)<select name="placement">{placements.map((placement) => <option value={placement.id} selected={advertisement?.placement === placement.id}>{placement.label}</option>)}</select></label>
+    <label>Original ad space (for reference; shown in all ad spaces)<select name="placement">{placements.map((placement) => <option value={placement.id} selected={advertisement?.placement === placement.id}>{placement.label}</option>)}</select></label>
     <label>Starts (India time)<input name="startsAt" required type="datetime-local" value={startsAt} /></label>
     <label>Ends (India time, optional)<input name="endsAt" type="datetime-local" value={inputDateTime(advertisement?.endsAt)} /></label>
-    <label>Expiry mode<select name="expiry"><option value="none" selected={!advertisement?.endsAt}>No expiry</option><option value="date" selected={!!advertisement?.endsAt}>Use end date</option><option value="duration">Duration from start</option></select></label>
+    <label>When should this ad stop?<select name="expiry"><option value="none" selected={!advertisement?.endsAt}>No expiry</option><option value="date" selected={!!advertisement?.endsAt}>Use end date</option><option value="duration">Duration from start</option></select></label>
     <label>Duration (days, if selected)<input type="number" name="durationDays" min="1" max="3650" step="1" value="30" /></label>
-    <label>Priority<input name="priority" required type="number" min="0" max="1000" step="1" value={advertisement?.priority ?? 0} /></label>
+    <label>Display order<input name="priority" required type="number" min="0" max="1000" step="1" value={advertisement?.priority ?? 0} /></label>
     <label>Status<select name="status"><option value="draft" selected={advertisement?.status !== "published"}>Draft</option><option value="published" selected={advertisement?.status === "published"}>Published</option></select></label>
-    <label class="admin-span-2">Destination URL (optional)<input name="destinationUrl" type="url" inputmode="url" maxlength="1000" value={advertisement?.destinationUrl ?? ""} placeholder="https://advertiser.example/offer" /></label>
+    <label class="admin-span-2">Link to open when clicked (optional)<input name="destinationUrl" type="url" inputmode="url" maxlength="1000" value={advertisement?.destinationUrl ?? ""} placeholder="https://advertiser.example/offer" /></label>
     <label class="admin-span-2">Public Google Drive image (optional)<input name="creativeUrl" type="url" inputmode="url" maxlength="1000" value={advertisement?.creativeSourceUrl ?? ""} placeholder="https://drive.google.com/file/d/…/view" /></label>
     <label>English headline<input name="headlineEn" maxlength="180" value={advertisement?.headlineEn ?? ""} /></label>
     <label lang="hi">हिंदी शीर्षक<input name="headlineHi" maxlength="180" value={advertisement?.headlineHi ?? ""} lang="hi" /></label>
     <label>English text<textarea name="bodyEn" maxlength="600" rows="4">{advertisement?.bodyEn ?? ""}</textarea></label>
     <label lang="hi">हिंदी टेक्स्ट<textarea name="bodyHi" maxlength="600" rows="4" lang="hi">{advertisement?.bodyHi ?? ""}</textarea></label>
-    <label>English image alternative text<input name="creativeAltEn" maxlength="240" value={advertisement?.creativeAltEn ?? ""} /></label>
+    <label>English image description (for screen readers)<input name="creativeAltEn" maxlength="240" value={advertisement?.creativeAltEn ?? ""} /></label>
     <label lang="hi">हिंदी चित्र वैकल्पिक पाठ<input name="creativeAltHi" maxlength="240" value={advertisement?.creativeAltHi ?? ""} lang="hi" /></label>
   </div>
-  <p class="admin-help">Provide a public Drive image, text creative, or both. Advertiser HTML, JavaScript, iframes and tracking pixels are never accepted.</p>
+  <p class="admin-help">Add a public Google Drive image, advertisement text, or both. Website code and tracking tools are not accepted.</p>
   <div class="admin-actions"><button class="button" type="submit">{advertisement ? "Save advertisement" : "Create advertisement"}</button></div>
 </form>

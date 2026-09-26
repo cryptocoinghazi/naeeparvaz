@@ -15,14 +15,14 @@ const dateValue = article?.publishedAt.slice(0, 10) ?? new Intl.DateTimeFormat("
 <form class="admin-form" method="post" action="/api/editor/articles/">
   {article && <input type="hidden" name="id" value={article.id} />}
   <div class="admin-form-grid">
-    <label>Stable URL slug<input name="slug" required={!article} readonly={Boolean(article)} minlength="3" maxlength="120" pattern="[a-z0-9]+(?:-[a-z0-9]+)*" value={article?.slug ?? ""} placeholder="city-council-public-meeting" /></label>
+    <label>Article address (lowercase words separated by hyphens; fixed after creation)<input name="slug" required={!article} readonly={Boolean(article)} minlength="3" maxlength="120" pattern="[a-z0-9]+(?:-[a-z0-9]+)*" value={article?.slug ?? ""} placeholder="city-council-public-meeting" /></label>
     <label>Byline<input name="byline" required minlength="2" maxlength="120" value={article?.byline ?? "Naee Parvaz News Desk"} /></label>
     <label>Publication date<input name="publishedAt" required type="date" value={dateValue} /></label>
     <label>Status<select name="status"><option value="draft" selected={article?.status !== "published"}>Draft</option><option value="published" selected={article?.status === "published"}>Published</option></select></label>
     <label>Source type<select name="sourceType"><option value="original" selected={article?.sourceType !== "external"}>Original reporting</option><option value="external" selected={article?.sourceType === "external"}>External source</option></select></label>
     <label class="admin-check admin-check-bottom"><input name="featured" type="checkbox" checked={article?.featured} /> Feature on the homepage</label>
     <label>Source/publisher name<input name="sourceName" maxlength="160" value={article?.sourceName ?? ""} /></label>
-    <label>Exact source URL<input name="sourceUrl" type="url" inputmode="url" maxlength="1000" value={article?.sourceUrl ?? ""} placeholder="https://…" /></label>
+    <label>Source website link<input name="sourceUrl" type="url" inputmode="url" maxlength="1000" value={article?.sourceUrl ?? ""} placeholder="https://…" /></label>
     <label class="admin-span-2">Google Drive cover image (optional)<input name="coverUrl" type="url" inputmode="url" maxlength="1000" value={article?.coverSourceUrl ?? ""} placeholder="https://drive.google.com/file/d/…/view" /></label>
     <AdminLabelFields labels={labels} selected={selectedLabels} />
 
@@ -31,7 +31,7 @@ const dateValue = article?.publishedAt.slice(0, 10) ?? new Intl.DateTimeFormat("
       <div class="admin-form-grid">
         <label class="admin-span-2">Headline<input name="titleEn" maxlength="240" value={article?.translations.en?.title ?? ""} /></label>
         <label class="admin-span-2">Summary<textarea name="summaryEn" maxlength="600" rows="3">{article?.translations.en?.summary ?? ""}</textarea></label>
-        <label class="admin-span-2">Article body (safe Markdown)<textarea name="bodyEn" maxlength="50000" rows="16">{article?.translations.en?.bodyMarkdown ?? ""}</textarea></label>
+        <label class="admin-span-2">Article text (use **bold** or ## for headings)<textarea name="bodyEn" maxlength="50000" rows="16">{article?.translations.en?.bodyMarkdown ?? ""}</textarea></label>
         <label class="admin-span-2">Cover image alternative text<input name="coverAltEn" maxlength="240" value={article?.translations.en?.coverAlt ?? ""} /></label>
       </div>
     </fieldset>
@@ -41,7 +41,7 @@ const dateValue = article?.publishedAt.slice(0, 10) ?? new Intl.DateTimeFormat("
       <div class="admin-form-grid">
         <label class="admin-span-2">शीर्षक<input name="titleHi" maxlength="240" value={article?.translations.hi?.title ?? ""} lang="hi" /></label>
         <label class="admin-span-2">सारांश<textarea name="summaryHi" maxlength="600" rows="3" lang="hi">{article?.translations.hi?.summary ?? ""}</textarea></label>
-        <label class="admin-span-2">लेख (सुरक्षित Markdown)<textarea name="bodyHi" maxlength="50000" rows="16" lang="hi">{article?.translations.hi?.bodyMarkdown ?? ""}</textarea></label>
+        <label class="admin-span-2">लेख (मोटे अक्षरों के लिए **शब्द** लिखें)<textarea name="bodyHi" maxlength="50000" rows="16" lang="hi">{article?.translations.hi?.bodyMarkdown ?? ""}</textarea></label>
         <label class="admin-span-2">कवर चित्र का वैकल्पिक पाठ<input name="coverAltHi" maxlength="240" value={article?.translations.hi?.coverAlt ?? ""} lang="hi" /></label>
       </div>
     </fieldset>
@@ -59,7 +59,7 @@ const dateValue = article?.publishedAt.slice(0, 10) ?? new Intl.DateTimeFormat("
       </div>
     </fieldset>
   </div>
-  <p class="admin-help">Complete at least one language. If the other translation is empty, readers see the available version. Markdown HTML is escaped.</p>
+  <p class="admin-help">Complete at least one language. If the other translation is empty, readers see the available version. Website code is shown as text and cannot run.</p>
   <div class="admin-actions">
     <button class="button" type="submit">{article ? "Save article" : "Create article"}</button>
     {article && <a class="button button-outline" href={`/editor/articles/${article.id}/preview/`} target="_blank" rel="noopener">Preview</a>}
