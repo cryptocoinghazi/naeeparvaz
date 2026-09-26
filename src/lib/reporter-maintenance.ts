@@ -78,6 +78,7 @@ async function performMaintenance(client:PoolClient):Promise<boolean> {
         const card=(await client.query('SELECT * FROM reporter_cards WHERE application_id=$1 AND deleted_at IS NULL',[id])).rows[0];
         if(card) {await deletePrivate(card.image_key);await deletePrivate(card.pdf_key);await client.query('UPDATE reporter_cards SET deleted_at=now() WHERE id=$1',[card.id]);}
         await client.query("UPDATE reporter_applications SET profile='{}',purged_at=now() WHERE id=$1",[id]);
+        await client.query('DELETE FROM reporter_policy_acceptances WHERE application_id=$1',[id]);
         await client.query("UPDATE reporter_events SET note='' WHERE application_id=$1",[id]);
         await client.query("UPDATE reporter_emails SET body='',subject='',status=CASE WHEN status IN ('pending','sending') THEN 'unknown' ELSE status END WHERE application_id=$1",[id]);
         await client.query('DELETE FROM reporter_corrections WHERE application_id=$1',[id]);

@@ -2,8 +2,10 @@
 import EditorLayout from '../../../layouts/EditorLayout.astro';
 import { application, applicationFiles, database, type Card } from '../../../lib/reporters';
 import { reporterNumber, indiaToday } from '../../../lib/reporter-card';
+import { policyAcceptances } from '../../../lib/reporter-policy';
 const app=await application(Astro.params.id || ''); if(!app) return new Response('Not found',{status:404});
 const files=await applicationFiles(app.id);
+const acceptances=await policyAcceptances(app.id);
 const events=(await database().query('SELECT actor,action,note,created_at FROM reporter_events WHERE application_id=$1 ORDER BY created_at DESC',[app.id])).rows;
 const emails=(await database().query('SELECT id,kind,status,created_at FROM reporter_emails WHERE application_id=$1 ORDER BY created_at DESC',[app.id])).rows;
 const card=(await database().query('SELECT * FROM reporter_cards WHERE application_id=$1',[app.id])).rows[0] as Card|undefined;
@@ -23,5 +25,11 @@ const fields:Record<string,string>={name:'Name',email:'Email',phone:'Phone',addr
 {card && <section class="admin-section"><h2>Issued card — {reporterNumber(Number(card.number))}</h2><p>{cardStatus} · {card.designation}</p><p>Joined: {new Date(card.joined_on).toLocaleDateString('en-IN')} · Expires: {new Date(card.expires_on).toLocaleDateString('en-IN')}</p>{!card.deleted_at && <><img class="id-preview" src={`/api/editor/reporters/file/?kind=card-image&id=${card.id}`} alt="Issued reporter ID" width="454" height="640"/><p><a href={`/api/editor/reporters/file/?kind=card-pdf&id=${card.id}`}>Download PDF</a> · <a href={`/api/editor/reporters/file/?kind=card-image&id=${card.id}&download=1`}>Download image</a></p></>}{!card.revoked_at && !app.purged_at && <form method="post" class="admin-form" action="/api/editor/reporters/action/"><input type="hidden" name="action" value="revoke"/><input type="hidden" name="id" value={app.id}/><label>Revocation reason<textarea name="note" required maxlength="2000"></textarea></label><label><input type="checkbox" name="confirm" value="yes" required/> Confirm revocation and notification</label><button class="button button-outline">Revoke ID</button></form>}</section>}
 <section class="admin-section"><h2>Email delivery</h2>{emails.map((email) => <div><p>{email.kind}: {email.status}</p>{email.status==='failed' && !app.purged_at && <form method="post" action="/api/editor/reporters/action/"><input type="hidden" name="action" value="retry-email"/><input type="hidden" name="id" value={app.id}/><input type="hidden" name="emailId" value={email.id}/><button class="button button-outline">Retry confirmed failure</button></form>}{email.status==='unknown' && <p>Delivery outcome is unknown. Check the email provider before taking further action; no automatic resend.</p>}</div>)}</section>
 <section class="admin-section"><h2>Review history</h2><ul>{events.map((e) => <li>{new Date(e.created_at).toLocaleString('en-IN')} · {e.action} · {e.actor}<p>{e.note}</p></li>)}</ul></section>
+<section class="admin-section"><h2>Reporter policy acceptance</h2>
+{app.purged_at?<p>Personal acceptance records removed under the profile-retention policy.</p>:acceptances.length?acceptances.map(acceptance=><details><summary>Version {acceptance.policy_version_id} — {new Date(acceptance.accepted_at).toLocaleString('en-IN',{timeZone:'Asia/Kolkata'})} IST — {acceptance.locale==='hi'?'Hindi':'English'}</summary>
+<p>Applicant at acceptance: {acceptance.applicant_name}</p>
+<div lang={acceptance.locale}><h3>{acceptance.locale==='hi'?acceptance.document.titleHi:acceptance.document.titleEn}</h3><p style="white-space:pre-wrap;overflow-wrap:anywhere">{acceptance.locale==='hi'?acceptance.document.bodyHi:acceptance.document.bodyEn}</p><p><strong>Accepted declaration:</strong> {acceptance.locale==='hi'?acceptance.document.attestationHi:acceptance.document.attestationEn}</p></div>
+</details>):<p>Not collected before policy introduction.</p>}
+</section>
 </EditorLayout>
 <style>.id-preview { width:min(100%,454px); height:auto; margin:1rem 0; } .reporter-details { display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:1rem; } dd { margin:0;white-space:pre-wrap;overflow-wrap:anywhere; } dt { font-weight:bold; } </style>

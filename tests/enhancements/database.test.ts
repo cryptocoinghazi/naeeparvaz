@@ -14,6 +14,8 @@ import { reporterMaintenance, maintenanceState } from '../../src/lib/reporter-ma
 import { saveAdvertisement, getActiveAdvertisements, deleteAdvertisement } from '../../src/lib/ad-repository';
 import { syncTv, tvQueue } from '../../src/lib/tv';
 import { POST as submitRoute } from '../../src/pages/api/reporters/submit';
+import { policySettings, currentReporterPolicy, savePolicyDraft, publishPolicy, policyAcceptances } from '../../src/lib/reporter-policy';
+import { ReporterInputError } from '../../src/lib/reporter-input';
 
 test('isolated local schema: migrations, ads, YouTube synchronization, reporter lifecycle and retention', {skip:process.env.ENHANCEMENT_DB_TEST!=='1',timeout:180000},async() => {
   const url=new URL(process.env.DATABASE_URL || '');
@@ -49,6 +51,8 @@ test('isolated local schema: migrations, ads, YouTube synchronization, reporter 
     await db.query(await readFile('db/migrations/005_ads_tv_reporters.sql','utf8'));
     assert.deepEqual((await db.query('SELECT * FROM videos ORDER BY id')).rows,before,'Migration preserves existing video records');
     for(const file of migrations.filter((n)=>n>'005_ads_tv_reporters.sql')) await db.query(await readFile(`db/migrations/${file}`,'utf8'));
+    assert.equal(await currentReporterPolicy(),null,'Migration seeds a draft without changing public registration');
+    assert.match((await policySettings()).body_en,/This declaration does not exclude/);
     assert.equal(await reporterMaintenance({source:'automatic'}),'unconfigured','No cleanup before editor accepts retention');
     const first=await saveAdvertisement({}, {clientName:'Client A',placement:'home',priority:10,startsAt:'2026-01-01',status:'published',headlineEn:'A'});
     await saveAdvertisement({}, {clientName:'Client B',placement:'article-end',priority:1,startsAt:'2026-01-01',status:'published',headlineEn:'B'});
@@ -145,6 +149,48 @@ test('isolated local schema: migrations, ads, YouTube synchronization, reporter 
     assert.equal((await db.query("SELECT count(*) FROM reporter_files WHERE object_key LIKE 'test/backlog/%' AND deleted_at IS NULL")).rows[0].count,'1');
     await db.query("UPDATE reporter_maintenance_state SET next_run_at=now()-interval '1 minute'");
     assert.equal(await reporterMaintenance({source:'automatic'}),'succeeded','The next scheduled batch completes the remaining work');
+    // Policy activation, immutable versions, pinned sessions, corrections and retention.
+    await db.query("UPDATE reporter_settings SET settings=jsonb_set(settings,'{enabled}','true')");
+    const legacy=await startApplication('legacy-policy@example.invalid');
+    const draft=await policySettings();
+    const draftForm=new FormData();draftForm.set('revision',String(draft.revision));draftForm.set('bodyEn',draft.body_en);draftForm.set('bodyHi',draft.body_hi);
+    await savePolicyDraft(draftForm);assert.equal(await currentReporterPolicy(),null,'Saving never publishes');
+    await assert.rejects(savePolicyDraft(draftForm),/another tab/,'Stale editors cannot overwrite a draft');
+    const publish=new FormData();publish.set('revision',String((await policySettings()).revision));
+    await assert.rejects(publishPolicy(publish,'editor'),/Confirm/);publish.set('confirm','yes');
+    const v1=await publishPolicy(publish,'editor');assert.equal(await publishPolicy(publish,'editor'),v1,'Repeated publishing is idempotent');
+    await assert.rejects(db.query("UPDATE reporter_policy_versions SET document='{}' WHERE id=$1",[v1]),/immutable/);
+    await assert.rejects(db.query('DELETE FROM reporter_policy_versions WHERE id=$1',[v1]),/immutable/);
+    await assert.rejects(submitApplication(legacy.token,profile),e=>e instanceof ReporterInputError && e.code==='POLICY_REVIEW_REQUIRED');
+    const policySession=await startApplication('policy-applicant@example.invalid');assert.equal(policySession.policy?.id,v1);
+    for(const kind of ['photo','identity','payment'])await uploadApplicationFile(policySession.token,kind,png);
+    await assert.rejects(submitApplication(policySession.token,profile),e=>e instanceof ReporterInputError && e.code==='POLICY_VERSION_MISMATCH');
+    profile.set('policyVersionId',String(v1));
+    await assert.rejects(submitApplication(policySession.token,profile),e=>e instanceof ReporterInputError && e.code==='POLICY_CONSENT_REQUIRED');
+    profile.set('policyConsent','on');await assert.rejects(submitApplication(policySession.token,profile),e=>e instanceof ReporterInputError && e.code==='POLICY_CONSENT_REQUIRED');
+    profile.set('policyConsent','yes');profile.set('policyVersionId','999999');await assert.rejects(submitApplication(policySession.token,profile),e=>e instanceof ReporterInputError && e.code==='POLICY_VERSION_MISMATCH');
+    draftForm.set('revision',String((await policySettings()).revision));draftForm.set('bodyEn',draft.body_en+'\nUpdated policy text.');await savePolicyDraft(draftForm);
+    await assert.rejects(publishPolicy(publish,'editor'),/draft changed/);
+    assert.equal((await currentReporterPolicy())?.id,v1,'Unpublished edits remain private');
+    publish.set('revision',String((await policySettings()).revision));const v2=await publishPolicy(publish,'editor');assert.notEqual(v1,v2);
+    profile.set('policyVersionId',String(v1));profile.set('locale','hi');profile.set('policyBody','FORGED TEXT');profile.set('acceptedAt','1900-01-01');
+    const policyId=await submitApplication(policySession.token,profile);
+    assert.equal(await submitApplication(policySession.token,profile),policyId);
+    const firstAcceptance=await policyAcceptances(policyId);assert.equal(firstAcceptance.length,1);assert.equal(firstAcceptance[0].policy_version_id,v1);
+    assert.equal(firstAcceptance[0].document.bodyEn,draft.body_en);assert.equal(firstAcceptance[0].locale,'hi');assert.equal(firstAcceptance[0].applicant_name,'Test Reporter');
+    assert.ok(new Date(firstAcceptance[0].accepted_at).getTime()>Date.now()-60000,'Server supplies acceptance time');
+    await reviewApplication(policyId,'changes-requested','Review correction','editor');
+    const policyCorrectionBody=(await db.query("SELECT body FROM reporter_emails WHERE application_id=$1 AND kind='correction'",[policyId])).rows[0].body;
+    const policyCorrection=await startApplication('policy-applicant@example.invalid',policyCorrectionBody.match(/correction=([a-f0-9]{64})/)[1]);assert.equal(policyCorrection.policy?.id,v2);
+    profile.set('policyVersionId',String(v2));profile.delete('policyConsent');
+    await assert.rejects(submitApplication(policyCorrection.token,profile),e=>e instanceof ReporterInputError && e.code==='POLICY_CONSENT_REQUIRED');
+    profile.set('policyConsent','yes');assert.equal(await submitApplication(policyCorrection.token,profile),policyId);
+    assert.deepEqual((await policyAcceptances(policyId)).map(a=>a.policy_version_id),[v1,v2],'Correction adds history, never overwrites prior consent');
+    assert.equal((await policyAcceptances(id)).length,0,'Legacy applications never get fabricated consent');
+    await reviewApplication(policyId,'reject','Retention test','editor');
+    await db.query("UPDATE reporter_applications SET finalized_at=now()-interval '200 days' WHERE id=$1",[policyId]);
+    await reporterMaintenance();assert.equal((await policyAcceptances(policyId)).length,0,'Acceptance PII follows profile retention');
+    assert.equal(Number((await db.query('SELECT count(*) FROM reporter_policy_versions')).rows[0].count),2,'Non-personal policies are retained');
   } finally {
     globalThis.fetch=originalFetch;S3Client.prototype.send=originalSend;
     await getDatabase()?.end();

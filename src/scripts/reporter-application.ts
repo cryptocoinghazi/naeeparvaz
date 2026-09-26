@@ -1,5 +1,6 @@
 import type { Profile, ReporterSettings } from '../lib/reporters';
 import { ReporterInputError, reporterText, reporterTextRules } from '../lib/reporter-input';
+import type { PublicReporterPolicy } from '../lib/reporter-policy-text';
 const begin=document.querySelector<HTMLFormElement>('[data-reporter-begin]');
 const form=document.querySelector<HTMLFormElement>('[data-reporter-form]');
 if(begin && form) {
@@ -13,6 +14,7 @@ if(begin && form) {
     clearFieldError();
     const candidate=(field.startsWith('file:')?null:form.elements.namedItem(field)) || Array.from(form.querySelectorAll<HTMLInputElement>('[data-file-kind]')).find(input=>input.dataset.fileKind===field.replace(/^file:/,''));
     if(candidate instanceof HTMLInputElement || candidate instanceof HTMLTextAreaElement || candidate instanceof HTMLSelectElement) {
+      if(candidate.closest('[hidden]'))return;
       invalidField=candidate;candidate.setAttribute('aria-invalid','true');candidate.setAttribute('aria-describedby',fieldError.id);
       fieldError.textContent=message;candidate.after(fieldError);candidate.focus();candidate.scrollIntoView({block:'center'});
     }
@@ -26,9 +28,19 @@ if(begin && form) {
     try {
       const data=new FormData(begin);
       const response=await fetch('/api/reporters/session/',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:data.get('email'),turnstile:data.get('cf-turnstile-response'),correction})});
-      const result=await response.json() as {token:string;error?:string;profile?:Profile;files?:string[];terms:ReporterSettings};
+      const result=await response.json() as {token:string;error?:string;profile?:Profile;files?:string[];terms:ReporterSettings;policy?:PublicReporterPolicy|null};
       if(!response.ok) throw new Error(result.error);
       token=result.token; const s=result.terms;
+      const policy=result.policy;
+      form.querySelector<HTMLElement>('[data-reporter-policy]')!.hidden=!policy;
+      form.querySelector<HTMLElement>('[data-policy-link]')!.hidden=!policy;
+      const policyConsent=form.querySelector<HTMLInputElement>('[name="policyConsent"]')!;
+      policyConsent.checked=false;policyConsent.required=!!policy;policyConsent.disabled=!policy;
+      form.querySelector<HTMLInputElement>('[name="policyVersionId"]')!.value=policy?String(policy.id):'';
+      form.querySelector('[data-policy-title]')!.textContent=policy?(hi?policy.document.titleHi:policy.document.titleEn):'';
+      form.querySelector('[data-policy-version]')!.textContent=policy?String(policy.id):'';
+      form.querySelector('[data-policy-body]')!.textContent=policy?(hi?policy.document.bodyHi:policy.document.bodyEn):'';
+      form.querySelector('[data-policy-attestation]')!.textContent=policy?(hi?policy.document.attestationHi:policy.document.attestationEn):'';
       if(result.profile) for(const [key,value] of Object.entries(result.profile)) {const field=form.elements.namedItem(key); if(field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement || field instanceof HTMLSelectElement) field.value=value;}
       for(const kind of result.files || []) {const field=form.querySelector<HTMLInputElement>(`[data-file-kind="${kind}"]`); if(field) field.required=false; const note=form.querySelector(`[data-existing-kind="${kind}"]`); if(note) note.textContent=hi?'पहले अपलोड की गई फ़ाइल मौजूद है; बदलना वैकल्पिक है।':'Existing file retained; replacement optional.';}
       document.querySelector('[data-payment-summary]')!.textContent=`₹${s.fee.toFixed(2)} — ${s.payee}`;
@@ -48,6 +60,7 @@ if(begin && form) {
       const values=new FormData(form);
       // Validate trimmed values before uploading anything, including when HTML validation is bypassed.
       for(const key of Object.keys(reporterTextRules) as (keyof typeof reporterTextRules)[]) reporterText(values,key);
+      if(form.querySelector<HTMLInputElement>('[name="policyConsent"]')?.required && values.get('policyConsent')!=='yes')throw new ReporterInputError('POLICY_CONSENT_REQUIRED','policyConsent',hi?'आवेदन जमा करने से पहले रिपोर्टर नीति पढ़ें और स्वीकार करें।':'Read and accept the reporter policy before submitting.');
       for(const field of form.querySelectorAll<HTMLInputElement>('[data-file-kind]')) {
         const file=field.files?.[0],kind=field.dataset.fileKind!;
         if(!file || uploaded.get(kind)===file) continue;

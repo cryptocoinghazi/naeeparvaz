@@ -1,0 +1,32 @@
+---
+import { policySettings, policyHistory } from '../lib/reporter-policy';
+import { policyLabels } from '../lib/reporter-policy-text';
+const draft=await policySettings();
+const history=await policyHistory();
+---
+<section class="admin-section" id="reporter-policy-settings">
+<h2>Reporter policy</h2>
+{Astro.url.searchParams.has('policySaved') && <p role="status">Policy saved. Check the publication status below.</p>}
+{Astro.url.searchParams.has('policyError') && <p role="alert">{Astro.url.searchParams.get('policyError')}</p>}
+<p>{draft.current_version_id?`Published version: ${draft.current_version_id}. New application sessions must accept it.`:'Not published. Reporter applications continue without the new declaration until you publish the first version.'}</p>
+<p>This is an organisational policy, not a guarantee of legal immunity. Obtain Indian legal review before publishing. Payment, refund and privacy terms remain separate.</p>
+<form class="admin-form" action="/api/editor/reporters/policy/" method="post">
+<input type="hidden" name="action" value="save"/><input type="hidden" name="revision" value={draft.revision}/>
+<label>English policy draft<textarea name="bodyEn" required minlength="50" maxlength="20000" rows="16">{draft.body_en}</textarea></label>
+<label>हिंदी नीति का मसौदा<textarea name="bodyHi" lang="hi" required minlength="50" maxlength="20000" rows="16">{draft.body_hi}</textarea></label>
+<button class="button">Save policy draft</button><p>Saving does not publish. Save your edits, then review both previews below.</p>
+</form>
+<details open><summary>Saved bilingual preview — draft revision {draft.revision}</summary>
+<h3 lang="en">{policyLabels.titleEn}</h3><p class="policy-copy" lang="en">{draft.body_en}</p><p lang="en"><strong>Required declaration:</strong> {policyLabels.attestationEn}</p>
+<h3 lang="hi">{policyLabels.titleHi}</h3><p class="policy-copy" lang="hi">{draft.body_hi}</p><p lang="hi">{policyLabels.attestationHi}</p>
+</details>
+<form class="admin-form" action="/api/editor/reporters/policy/" method="post">
+<input type="hidden" name="action" value="publish"/><input type="hidden" name="revision" value={draft.revision}/>
+<label class="policy-confirm"><input type="checkbox" name="confirm" value="yes" required/> I reviewed the saved English and Hindi previews and authorize publication. Unsaved text above is not included.</label>
+<button class="button" disabled={draft.revision===draft.published_revision}>Publish saved policy version</button>
+<p>Published versions cannot be changed. Future edits create a new version; existing acceptance records and established sessions keep their original wording.</p>
+</form>
+<h3>Publication history</h3>
+{history.length?<ul>{history.map(version=><li>Version {version.id} — {new Date(version.published_at).toLocaleString('en-IN',{timeZone:'Asia/Kolkata'})} IST — {version.published_by}</li>)}</ul>:<p>No published versions.</p>}
+</section>
+<style>.policy-copy{white-space:pre-wrap;overflow-wrap:anywhere}.policy-confirm{display:flex;align-items:flex-start;gap:.6rem}.policy-confirm input{width:20px;height:20px;min-height:20px;flex-shrink:0}</style>

@@ -11,7 +11,7 @@ const url=new URL(process.env.DATABASE_URL || '');
 assert.ok(['127.0.0.1','localhost'].includes(url.hostname) && url.username==='naee' && url.password==='local-development-only' && url.pathname==='/naee_parvaz','Local compose database required');
 const schema=`np_browser_test_${randomUUID().replaceAll('-','')}`;
 const admin=new pg.Pool({connectionString:url.toString(),max:1});
-let scoped,browser,server;
+let scoped,browser,server,sessionPolicy=null;
 const base='http://127.0.0.1:4338';
 try {
   await admin.query(`CREATE SCHEMA ${schema}`);
@@ -33,7 +33,7 @@ try {
   let ready=false;
   for(let i=0;i<50;i++) {try {const r=await fetch(base+'/en/');if(r.ok){ready=true;break;}}catch {}await delay(200);}
   assert.ok(ready,`Test server did not start: ${logs.slice(-2000)}`);
-  for(const path of ['/api/editor/reporters/file/?id='+appId,'/api/editor/reporters/action/','/api/editor/reporters/maintenance/','/api/editor/tv/']) {
+  for(const path of ['/api/editor/reporters/file/?id='+appId,'/api/editor/reporters/action/','/api/editor/reporters/policy/','/api/editor/reporters/maintenance/','/api/editor/tv/']) {
     const response=await fetch(base+path,{method:path.includes('file')?'GET':'POST',headers:{Origin:base,'Content-Type':'application/json'},redirect:'manual'});assert.ok([401,403].includes(response.status),`${path} is protected`);
   }
   browser=await chromium.launch({headless:true});
@@ -44,7 +44,7 @@ try {
     await context.route('**/*',async route=>{
       const requestUrl=new URL(route.request().url());
       if(requestUrl.origin!==base) return route.abort();
-      if(requestUrl.pathname==='/api/reporters/session/') return route.fulfill({json:{token:'a'.repeat(64),terms:settings}});
+      if(requestUrl.pathname==='/api/reporters/session/') return route.fulfill({json:{token:'a'.repeat(64),terms:settings,policy:sessionPolicy}});
       // Chromium ignores Cookie overrides in route.continue; use the API fetch transport for this test-only session.
       const response=await route.fetch({headers:{...route.request().headers(),cookie:`__Host-naee_admin=${session}`},maxRedirects:0});
       return route.fulfill({response});
@@ -69,6 +69,25 @@ try {
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),`${path}: no horizontal overflow at ${viewport.width}`);
       const results=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();
       assert.deepEqual(results.violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)})),[],`${path}: accessibility`);
+      if(path==='/editor/reporters/settings/' && viewport.width===1440) {
+        const policyEndpoint=base+'/api/editor/reporters/policy/';
+        const forbidden=await fetch(policyEndpoint,{method:'POST',headers:{Origin:'https://untrusted.invalid',Cookie:`__Host-naee_admin=${session}`,'Content-Type':'application/x-www-form-urlencoded'},body:'action=publish&revision=1&confirm=yes',redirect:'manual'});
+        assert.ok(forbidden.status===403 || forbidden.headers.get('location')?.includes('policyError'));
+        const noConfirmation=await fetch(policyEndpoint,{method:'POST',headers:{Origin:base,Cookie:`__Host-naee_admin=${session}`,'Content-Type':'application/x-www-form-urlencoded'},body:'action=publish&revision=1',redirect:'manual'});
+        assert.match(noConfirmation.headers.get('location'),/policyError/);
+        assert.equal((await scoped.query('SELECT current_version_id FROM reporter_policy_settings')).rows[0].current_version_id,null);
+        const english=page.locator('[name="bodyEn"]');const initial=await english.inputValue();
+        await english.fill(initial+'\nPRIVATE_DRAFT_TEST <script>window.__policyXss=true</script>');
+        await page.getByRole('button',{name:'Save policy draft',exact:true}).click();await page.waitForURL(/policySaved=1/);
+        assert.equal((await scoped.query('SELECT current_version_id FROM reporter_policy_settings')).rows[0].current_version_id,null);
+        assert.ok(!(await (await fetch(base+'/en/join/')).text()).includes('PRIVATE_DRAFT_TEST'),'Public pages never expose drafts');
+        assert.equal(await page.evaluate(()=>window.__policyXss),undefined,'Saved preview escapes HTML');
+        await page.locator('form[action="/api/editor/reporters/policy/"] [name="confirm"]').check();
+        const published=page.waitForResponse(r=>r.url().includes('/api/editor/reporters/policy/') && r.request().method()==='POST');
+        await page.getByRole('button',{name:'Publish saved policy version'}).click();await published;
+        await page.waitForLoadState('domcontentloaded');
+        sessionPolicy=(await scoped.query('SELECT id,document FROM reporter_policy_versions ORDER BY id DESC LIMIT 1')).rows[0];assert.ok(sessionPolicy);
+      }
       if(path==='/editor/reporters/' && viewport.width===1440) {
         const missingConfirm=await fetch(base+'/api/editor/reporters/maintenance/',{method:'POST',headers:{Origin:base,Cookie:`__Host-naee_admin=${session}`,'Content-Type':'application/x-www-form-urlencoded'},body:'',redirect:'manual'});
         assert.ok(missingConfirm.headers.get('location')?.includes('maintenance=confirm'));
@@ -88,6 +107,13 @@ try {
         assert.match(saved.headers().location || '',/\?saved=1$/,`Review response: ${saved.status()} ${saved.headers().location || await saved.text()}`);
         await page.waitForURL(url=>url.searchParams.get('saved')==='1',{waitUntil:'domcontentloaded'}).catch(error=>{throw new Error(`Editor save navigation ended at ${page.url()}: ${error.message}`);});
         assert.equal((await scoped.query('SELECT status FROM reporter_applications WHERE id=$1',[appId])).rows[0].status,'under-review','Authenticated editor form saves through the real protected API');
+        assert.match(await page.locator('body').innerText(),/Not collected before policy introduction/);
+        const acceptanceSession=randomUUID();
+        await scoped.query("INSERT INTO reporter_upload_sessions(id,token_hash,email,application_id,expires_at,terms,policy_version_id) VALUES($1,$2,'test@example.invalid',$3,now()+interval '30 minutes',$4,$5)",[acceptanceSession,createHash('sha256').update(acceptanceSession).digest('hex'),appId,settings,sessionPolicy.id]);
+        await scoped.query("INSERT INTO reporter_policy_acceptances(application_id,session_id,policy_version_id,applicant_name,locale) VALUES($1,$2,$3,'Test Applicant','hi')",[appId,acceptanceSession,sessionPolicy.id]);
+        await page.reload();
+        const acceptance=page.locator('details').filter({hasText:'Applicant at acceptance:'});await acceptance.locator('summary').click();
+        assert.match(await acceptance.innerText(),/IST — Hindi/);assert.ok((await acceptance.innerText()).includes(sessionPolicy.document.attestationHi));
       }
     }
     await page.clock.install();
@@ -113,12 +139,19 @@ try {
     assert.match(await page.locator('[data-payment-summary]').innerText(),/100/);
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Expanded form fits');
     const a11y=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();assert.deepEqual(a11y.violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)})),[],'Expanded form accessibility');
+    assert.equal(await page.locator('[name="policyConsent"]').isChecked(),false,'Policy consent starts unticked');
+    assert.equal(await page.locator('[name="policyConsent"]').getAttribute('required'),'');
+    assert.match(await page.locator('[data-policy-body]').innerText(),/PRIVATE_DRAFT_TEST/);
+    assert.equal(await page.evaluate(()=>window.__policyXss),undefined,'Published policy is text, not executable HTML');
+    await page.locator('[data-policy-link] a').focus();await page.keyboard.press('Enter');assert.equal(new URL(page.url()).hash,'#reporter-conduct-policy','Policy link works with the keyboard');
     await page.screenshot({path:`test-results/enhancements/application-${viewport.width}.png`,fullPage:true});
     let uploads=0,submissions=0;
     await page.route('**/api/reporters/upload/',route=>{uploads++;return route.fulfill({json:{id:'test-file'}});});
     await page.route('**/api/reporters/submit/',route=>{
       submissions++;
       assert.equal(route.request().postDataJSON().experience,'None');
+      assert.equal(route.request().postDataJSON().policyConsent,'yes');
+      assert.equal(route.request().postDataJSON().policyVersionId,String(sessionPolicy.id));
       return route.fulfill(submissions===1?{status:422,json:{error:'Choose a valid payment date.',field:'paymentDate',code:'INVALID_FIELD',reference:'test-reference'}}:{json:{id:'test-application'}});
     });
     for(const [field,value] of Object.entries({name:'Test Reporter',phone:'9999999999',address:'Test address district',area:'Yavatmal',languages:'Hindi',education:'Graduate',experience:' ',transaction:'TEST-123',paymentDate:'2026-01-01'}))await page.locator(`[data-reporter-form] [name="${field}"]`).fill(value);
@@ -129,6 +162,9 @@ try {
     assert.equal(uploads,0,'Invalid trimmed text is caught before uploading');
     assert.equal(submissions,0);
     await page.locator('[name="experience"]').fill('None');
+    await page.locator('[data-reporter-form]').dispatchEvent('submit');
+    await page.locator('[name="policyConsent"][aria-invalid="true"]').waitFor();assert.equal(uploads,0,'Consent is required before uploads');
+    await page.locator('[name="policyConsent"]').focus();await page.keyboard.press('Space');assert.equal(await page.locator('[name="policyConsent"]').isChecked(),true,'Declaration can be accepted with the keyboard');
     await page.locator('[data-reporter-form] button[type="submit"]').click();
     await page.locator('[name="paymentDate"][aria-invalid="true"]').waitFor();
     assert.equal(await page.locator('[name="name"]').inputValue(),'Test Reporter','Server validation preserves entered values');
@@ -140,6 +176,10 @@ try {
     await page.locator('[data-reporter-form]').waitFor({state:'hidden'});
     assert.equal(uploads,3,'Correcting a field does not upload the same files twice');
     assert.match(await page.locator('[data-reporter-status]').innerText(),/Application received/);
+    await page.goto(base+'/hi/join/');await page.locator('[data-reporter-begin] input[name="email"]').fill('test@example.invalid');await page.locator('[data-reporter-begin] button').click();await page.locator('[data-reporter-form]').waitFor({state:'visible'});
+    assert.equal(await page.locator('[data-policy-body]').innerText(),sessionPolicy.document.bodyHi);
+    assert.equal(await page.locator('[data-policy-attestation]').innerText(),sessionPolicy.document.attestationHi);
+    assert.equal(await page.locator('[name="policyConsent"]').isChecked(),false);
     assert.deepEqual(errors,[],'No browser script exceptions');
     await context.close();
   }

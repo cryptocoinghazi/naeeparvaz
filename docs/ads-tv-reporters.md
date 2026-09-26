@@ -74,6 +74,18 @@ Application text constraints are shared by the browser and server. Invalid submi
 
 ## Issuance, delivery and maintenance
 
+### Reporter conduct declaration
+
+Migration 007 adds an English/Hindi **draft** of the reporter conduct and ID-card use policy. It does not publish a legal agreement, close applications or fabricate acceptance on existing records. In **Editor → Reporters → Registration settings → Reporter policy**, save both translations, review the saved bilingual preview, then explicitly confirm **Publish saved policy version**. Legal review is recommended before publishing; this is not a blanket liability waiver. Unsaved edits are never published. Concurrent stale edits are rejected; repeating publication of the same saved revision does not create another version.
+
+The first publication enables mandatory consent. Only published wording is public. New application sessions receive the current policy; an established 30-minute session keeps its version even after another version is published. Sessions begun before first activation must refresh/start again and explicitly review the policy; no consent is inferred. Applicants get an unticked checkbox separate from privacy/payment consent, a policy link before payment and a field-specific error on missing acceptance. Corrections require fresh consent to the version shown for their new session.
+
+The submission transaction records the version, applicant-name snapshot, language, server timestamp and application/session identifiers. A retry of a submitted session returns the original application without duplicating acceptance. The editor's application details show exact accepted wording and IST timestamps. Old applications show “Not collected before policy introduction”; existing reviews and cards are unaffected. Published versions are immutable, enforced by a database trigger. Personal acceptance rows are deleted with the existing profile-retention purge; non-personal policy text remains. No extra IP addresses, signatures, documents, paid services or emails are introduced.
+
+Policy-management requests use the existing editor authentication and same-origin checks at `/api/editor/reporters/policy/`. Session responses additionally include `policy`; submission accepts `policyConsent=yes` and `policyVersionId`. Supplied policy text or acceptance timestamps are never trusted. Publication and production rollout require separate authorization after local review.
+
+### Existing card workflow
+
 Mark an application under review, verify payment, then enter designation/joining date and adjust crop. Generate and inspect a fresh preview. Approval requires that exact application/template/number version and confirmation. The next number is locked transactionally; concurrent approvals cannot reuse it. Long text that does not fit is rejected; adjust the template rather than silently clipping.
 
 Cards expire on the first anniversary (February 29 → February 28 where necessary). Revocation sends a notification. This is an organizational card, not government accreditation. No public verification portal, reporter login or publishing access is introduced. Previously downloaded cards cannot be remotely erased; revocation is recorded in the editor and communicated by email.

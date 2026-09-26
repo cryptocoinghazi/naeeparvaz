@@ -5,6 +5,8 @@ import { anniversary, indiaToday, defaultCardLayout, validateCardLayout, type Ca
 import { reporterStorageReady, putPrivate, validateReporterFile } from './reporter-storage';
 import { requiredText, optionalText, validEmail } from './validation';
 import { ReporterInputError, reporterText } from './reporter-input';
+import { currentReporterPolicy, checkPolicyAcceptance } from './reporter-policy';
+import type { PublicReporterPolicy } from './reporter-policy-text';
 
 export interface ReporterSettings {
   enabled:boolean; fee:number; payee:string; instructionsEn:string; instructionsHi:string;
@@ -55,7 +57,7 @@ export function requestLimitKey(request:Request):string {
   if (!process.env.SESSION_SECRET) throw new Error('Application security not configured.');
   return createHmac('sha256',process.env.SESSION_SECRET).update(`reporter:${request.headers.get('do-connecting-ip') || 'unknown'}`).digest('hex');
 }
-export async function startApplication(emailValue:unknown, correctionToken?:string):Promise<{token:string;profile?:Profile;files?:string[];terms:ReporterSettings}> {
+export async function startApplication(emailValue:unknown, correctionToken?:string):Promise<{token:string;profile?:Profile;files?:string[];terms:ReporterSettings;policy:PublicReporterPolicy|null}> {
   const email=validEmail(String(emailValue || ''));
   const settings=await reporterSettings();
   if (!settings.enabled || !applicationsConfigured(settings)) throw new Error('Applications are currently closed.');
@@ -67,8 +69,9 @@ export async function startApplication(emailValue:unknown, correctionToken?:stri
   }
   const token=randomBytes(32).toString('hex');
   const terms=paymentSnapshot(existing?.payment_terms || settings);
-  await database().query(`INSERT INTO reporter_upload_sessions(id,token_hash,email,application_id,expires_at,terms) VALUES($1,$2,$3,$4,now()+interval '30 minutes',$5)`,[randomUUID(),hashToken(token),email,existing?.id || null,terms]);
-  return {token,terms,profile:existing?.profile,files:existing ? (await applicationFiles(existing.id)).map((f) => f.kind) : undefined};
+  const policy=await currentReporterPolicy();
+  await database().query(`INSERT INTO reporter_upload_sessions(id,token_hash,email,application_id,expires_at,terms,policy_version_id) VALUES($1,$2,$3,$4,now()+interval '30 minutes',$5,$6)`,[randomUUID(),hashToken(token),email,existing?.id || null,terms,policy?.id || null]);
+  return {token,terms,policy,profile:existing?.profile,files:existing ? (await applicationFiles(existing.id)).map((f) => f.kind) : undefined};
 }
 export async function uploadApplicationFile(token:string,kind:string,bytes:Buffer) {
   if(!/^[a-f0-9]{64}$/.test(token)) throw new Error('Invalid session.');
@@ -98,6 +101,7 @@ export async function submitApplication(token:string,form:FormData):Promise<stri
     if(session.submitted_id) return session.submitted_id;
     if(new Date(session.expires_at).getTime()<Date.now()) throw new ReporterInputError('SESSION_EXPIRED','','Your 30-minute application session expired. Start a new application and upload the files again. / 30 मिनट का आवेदन सत्र समाप्त हुआ। नया आवेदन शुरू करके फ़ाइलें दोबारा अपलोड करें।');
     const profile=validateProfile(form,session.email);
+    const policyVersionId=await checkPolicyAcceptance(client,session,form);
     const existing=session.application_id ? (await client.query('SELECT * FROM reporter_applications WHERE id=$1 FOR UPDATE',[session.application_id])).rows[0] : undefined;
     if(existing && (existing.status!=='changes-requested' || existing.purged_at)) throw new ReporterInputError('CORRECTION_CLOSED','','Corrections are no longer available. Contact the editor. / संशोधन उपलब्ध नहीं है। संपादक से संपर्क करें।');
     const files=(await client.query('SELECT * FROM reporter_files WHERE session_id=$1 AND validated=true AND deleted_at IS NULL ORDER BY created_at DESC',[session.id])).rows;
@@ -106,6 +110,7 @@ export async function submitApplication(token:string,form:FormData):Promise<stri
     const id=existing?.id || randomUUID();
     if(existing) await client.query("UPDATE reporter_applications SET profile=$2,status='submitted',payment_verified=false,updated_at=now() WHERE id=$1",[id,profile]);
     else await client.query('INSERT INTO reporter_applications(id,locale,profile,payment_terms) VALUES($1,$2,$3,$4)',[id,form.get('locale')==='hi'?'hi':'en',profile,session.terms]);
+    if(policyVersionId)await client.query('INSERT INTO reporter_policy_acceptances(application_id,session_id,policy_version_id,applicant_name,locale) VALUES($1,$2,$3,$4,$5)',[id,session.id,policyVersionId,profile.name,form.get('locale')==='hi'?'hi':'en']);
     for(const kind of ['photo','identity','payment','qualification','experience']) {
       const file=files.find((f) => f.kind===kind);
       if(file) {

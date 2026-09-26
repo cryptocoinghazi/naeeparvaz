@@ -3,6 +3,7 @@ import EditorLayout from '../../../layouts/EditorLayout.astro';
 import { reporterSettings, currentTemplate } from '../../../lib/reporters';
 import { defaultCardLayout } from '../../../lib/reporter-card';
 import { reporterStorageReady } from '../../../lib/reporter-storage';
+import ReporterPolicySettings from '../../../components/ReporterPolicySettings.astro';
 const s=await reporterSettings();
 const template=await currentTemplate();
 ---
@@ -18,4 +19,5 @@ const template=await currentTemplate();
 <img src="/api/reporters/qr/" alt="Current payment QR" width="246" height="320" style="object-fit:contain;max-width:100%;height:auto"/>
 <label><input name="retentionConfirmed" type="checkbox" checked={s.retentionConfirmed}/> I confirm the retention policy and built-in daily maintenance. I will monitor its status on the Reporters page.</label><label><input type="checkbox" name="numberConfirmed" required/> I checked existing physical cards; this next number will not conflict.</label><button class="button">Save registration settings</button></form></section>
 <section class="admin-section"><h2>Versioned ID-card template</h2><p>The supplied JPEG is the default. Each saved template is a new version. Existing cards never change. All templates use a 908 × 1280 canvas.</p><form class="admin-form" method="post" action="/api/editor/reporters/action/" enctype="multipart/form-data"><input type="hidden" name="action" value="template"/><label>Replacement artwork (optional, max 5 MB)<input name="template" type="file" accept="image/jpeg,image/png,image/webp"/></label><label>Field coordinates, font sizes and colours (JSON)<textarea name="layout" rows="24" required spellcheck="false">{JSON.stringify(template?.layout || defaultCardLayout,null,2)}</textarea></label><label><input name="reviewed" type="checkbox" checked={template?.approved}/> I have reviewed the artwork, signature authorization and field placement for issuance.</label><button class="button">Save new template version</button></form><p>Each candidate still requires a fresh preview before approval. Changing the template invalidates approval of older previews.</p></section>
+<ReporterPolicySettings/>
 </EditorLayout>
